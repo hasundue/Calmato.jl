@@ -10,6 +10,7 @@ struct GFunction
 end
 
 struct Parameter
+    name::AbstractString
     symbol::Char
     comb::Vector{Vector{AbstractString}}
     order::Int
@@ -119,7 +120,7 @@ function parse_function(name::AbstractString, strs::Vector{SubString{String}}, f
     end
 
     N = length(funcstr)
-    str = "function $(name)(T)\n"
+    str = "function $(name)(T,P)\n"
     for i in 1:N
         for pair in ["LN(" => "log(", "**" => "^", ".+" => ".0+", ".-" => ".0-", ".*" => ".0*", "./" => ".0/"]
             funcstr[i] = replace(funcstr[i], pair)
@@ -127,9 +128,9 @@ function parse_function(name::AbstractString, strs::Vector{SubString{String}}, f
         funcstr[i] = strip(funcstr[i], ';')
 
         str *= i == 1 ? "\tif " : "\telseif "
-        str *= "$(T[i]) < T < $(T[i+1])\n"
+        str *= "$(T[i]) ≤ T ≤ $(T[i+1])\n"
         for func in funcs
-            funcstr[i] = replace(funcstr[i], func.name => "$(func.name)(T)")
+            funcstr[i] = replace(funcstr[i], func.name => "$(func.name)(T,P)")
         end
         str *= "\t\t" * funcstr[i] * "\n"
     end
@@ -171,7 +172,8 @@ function parse_parameter(text::AbstractString, funcs::Vector{GFunction})
 
     # L(Liquid,Cu,Zn;0), etc.
     text = vect[2]
-    funcname = strip(text, ['(', ')', ',', ':', ';'])
+    name = text
+    funcname = getfuncname(text)
     symbol = text[1]
     k = findfirst('(', text)
     l = findfirst(')', text)
@@ -183,7 +185,11 @@ function parse_parameter(text::AbstractString, funcs::Vector{GFunction})
     comb = map(text -> split(text, ','), split(comb_text, ':'))
     order = parse(Int, order_text)
     func = parse_function(funcname, vect[3:end], funcs)
-    return phas, Parameter(symbol, comb, order, func)
+    return phas, Parameter(name, symbol, comb, order, func)
+end
+
+function getfuncname(str::AbstractString)
+    filter(c -> !in(c, ['(', ')', ',', ':', ';']), str)
 end
 
 function print_func(db::Database)
