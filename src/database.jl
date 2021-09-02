@@ -17,15 +17,28 @@ struct Parameter
     func::AbstractString
 end
 
-const Constituent = Vector{Vector{AbstractString}}
+const Constitution = Vector{Vector{AbstractString}}
 
-struct Phase{T<:Real}
+mutable struct Phase{T<:Real}
     name::AbstractString
     state::Char
     model::AbstractString
     equi::Vector{T}
-    cons::Vector{Constituent}
+    cons::Constitution
     para::Vector{Parameter}
+
+    function Phase(name::AbstractString,
+                   state::Char,
+                   model::AbstractString,
+                   equi::Vector{T}) where T <: Real
+        ph = new{T}()
+        ph.name = name
+        ph.state = state
+        ph.model = model
+        ph.equi = equi
+        ph.para = Parameter[]
+        return ph
+    end
 end
 
 struct Database
@@ -60,10 +73,11 @@ function read_tdb(tdb::AbstractString)
                         phasname, cn = parse_constituent(text)
                         ph = filter(ph -> ph.name == phasname, phas)
                         @assert length(ph) == 1
-                        push!(ph[1].cons, cn)
+                        ph[1].cons = cn
                     elseif type == "Parameter"
                         phasname, pr = parse_parameter(text, func)
                         ph = filter(ph -> ph.name == phasname, phas)
+                        @assert length(ph) == 1
                         push!(ph[1].para, pr)
                     end
                 end
@@ -151,7 +165,7 @@ function parse_phase(text::AbstractString)
     vect = split(vect[2], ':') # "Liquid:L", "Bcc", "Fcc", etc.
     name = vect[1]
     state = length(vect) > 1 ? vect[2][1] : 'S'
-    return Phase(name, state, model, equi, Vector{Constituent}(), Vector{Parameter}())
+    return Phase(name, state, model, equi)
 end
 
 function parse_constituent(text::AbstractString)
@@ -227,7 +241,7 @@ function Base.print(db::Database)
     println("\tPhases: $nphas")
     for phas in db.phas
         print("\t\t$(phas.name); ")
-        cons = phas.cons[1]
+        cons = phas.cons
         nlatt = length(cons)
         for i in 1:nlatt
             print('(')
