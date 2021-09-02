@@ -111,11 +111,13 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15, P = 1.0)
             # 
             if isnothing(k)
                 if S > 2
-                    push!(G_expr, @NLexpression(model, funcval * x[j] * prod( y[i,j,k] for (i,k) in solo )))
+                    push!(G_expr,
+                          @NLexpression(model, funcval * x[j] * prod( y[i,j,k] for (i,k) in solo )))
                 elseif S == 1
                     i, k = solo[1]
                     push!(G_expr, @NLexpression(model, funcval * x[j] * y[i,j,k]))
                 else
+                    @assert S == 0
                     push!(G_expr, @NLexpression(model, funcval * x[j]))
                 end
             else
@@ -128,6 +130,7 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15, P = 1.0)
                     push!(G_expr, @NLexpression(model, funcval * x[j] * y[iₛ,j,kₛ]
                                                        * y[i₁,j,k] * y[i₂,j,k] * ( y[i₁,j,k] - y[i₂,j,k] )^ord))
                 else
+                    @assert S == 0
                     push!(G_expr, @NLexpression(model, funcval * x[j] * y[i₁,j,k] * y[i₂,j,k] * ( y[i₁,j,k] - y[i₂,j,k] )^ord))
                 end
             end
