@@ -81,7 +81,7 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15, P = 1.0)
     end
 
     # Gibbs energy contribution from each parameter
-    G_expr = Vector{JuMP.NonlinearExpression}()
+    G_expr = JuMP.NonlinearExpression[]
     for j in 1:M
         for para in sys.phas[j].para
             comb = para.comb
@@ -93,7 +93,7 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15, P = 1.0)
             funcval = func(T,P)
 
             sololatt = findall(latt -> length(latt) == 1, comb)
-            solo = Vector{Tuple{Int,Int}}()
+            solo = Tuple{Int,Int}[]
             for k in sololatt
                 i = findfirst(el -> el.name == comb[k][1], sys.elem)
                 if !isnothing(i) && !is_fixed(y[i,j,k])
@@ -104,6 +104,11 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15, P = 1.0)
             S = length(solo)
             k = findfirst(latt -> length(latt) == 2, comb)
 
+            # 
+            # FIX THIS:
+            # The reason of hardcoding with if-elseif-else is that calling prod() for an empty
+            # collection causes Inf as a return value of the objective function for some reason.
+            # 
             if isnothing(k)
                 if S > 2
                     push!(G_expr, @NLexpression(model, funcval * x[j] * prod( y[i,j,k] for (i,k) in solo )))
