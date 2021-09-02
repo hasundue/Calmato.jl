@@ -131,7 +131,8 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15, P = 1.0)
                                                        * y[i₁,j,k] * y[i₂,j,k] * ( y[i₁,j,k] - y[i₂,j,k] )^ord))
                 else
                     @assert S == 0
-                    push!(G_expr, @NLexpression(model, funcval * x[j] * y[i₁,j,k] * y[i₂,j,k] * ( y[i₁,j,k] - y[i₂,j,k] )^ord))
+                    push!(G_expr, @NLexpression(model, funcval * x[j]
+                                                       * y[i₁,j,k] * y[i₂,j,k] * ( y[i₁,j,k] - y[i₂,j,k] )^ord))
                 end
             end
         end
