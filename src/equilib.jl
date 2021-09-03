@@ -1,156 +1,193 @@
 struct EquilibResult
     sys::System
-    x::Vector{Float64} # mole fraction of each phase
-    y::Array{Float64,3}
+    X::Vector{Float64} # molar fractions of components
+    Y::Vector{Float64} # molar amount of phases
+    x::Array{Float64,2} # molar fractions of components in each phase
+    y::Array{Float64,3} # molar fractions of constituents in each sublattice
 end
 
 function Base.display(res::EquilibResult)
-    N = length(res.sys.elem)
-    M = length(res.sys.phas)
-    @assert length(res.x) == M
-    for j in 1:M
-        phas = res.sys.phas[j]
-        println("$(phas.name): x = $(res.x[j])")
-        L = length(phas.cons[1])
-        for k in 1:L
-            println("\tsublattice $k")
-            for i in 1:N
-                elname = res.sys.elem[i].name
-                println("\t\t$elname: y = $(res.y[i,j,k])")
+    I = length(res.sys.elem)
+    K = length(res.sys.phas)
+    @assert size(res.x) == (K,I)
+    for k in 1:K
+        phas = res.sys.phas[k]
+        res.Y[k] < 1e-5 && continue
+        @printf "%s: %.5f mol\n" phas.name res.Y[k]
+        S = length(phas.cons)
+        for s in 1:S
+            phas.cons[s] == [] && continue
+            println("\tsublattice $s")
+            for j in 1:I
+                consname = res.sys.elem[j].name
+                @printf "\t\t%s: %.4f\n" consname res.y[k,s,j]
             end
         end
     end
 end
 
-function equilib(sys::System, X = equiatom(sys), T = 298.15, P = 1.0)
-    N = length(sys.elem)
-    M = length(sys.phas)
+function equilib(sys::System, X = equiatom(sys), T = 298.15; eps = 1e-7)
+    elem = sys.elem
+    phas = sys.phas
 
-    # EAGO
+    # 
+    # TO DO:
+    # Consitituents are identical to components in the current version of Calmato.
+    # 
+    cons = elem
+
+    I = length(elem) # number of components
+    J = length(cons) # number of constituents
+    K = length(phas) # number of phases
+
+    # Maximum number of sublattices in a phase
+    S = maximum([ length(phas[k].cons) for k in 1:K ])
+
+    # Indexing constituent
+    cons_id = Dict{AbstractString,Int}()
+    for j in 1:J
+        push!(cons_id, cons[j].name => j)
+    end
+
+    # Put zero or empty elements in each sublattice for later use
+    for k in 1:K
+        @assert length(phas[k].equi) == length(phas[k].cons)
+        while length(phas[k].equi) < S
+            push!(phas[k].equi, zero(Int))
+            push!(phas[k].cons, Vector{Int}[])
+        end
+    end
+
+    # Reconstuction of constitution vector into an array of Int
+    constitution = [ map.(name -> get(cons_id, name, 0), phas[k].cons) for k in 1:K ]
+
+    # Number of sites on sublattice s in phase f, n[f,s]
+    n = [ phas[k].equi[s] for k in 1:K, s in 1:S ]
+    
+    #
+    # EAGO Optimizer
+    #
     model = Model(EAGO.Optimizer)
     set_optimizer_attributes(model, "verbosity" => 1,
                                     "output_iterations" => 1,
                                     "iteration_limit" => 1000,
                                     "absolute_tolerance" => 1e-3,
-                                    "relative_tolerance" => 1.0)
+                                    "relative_tolerance" => 1e-3,
+                                    "obbt_tolerance" => eps,
+                                    "dbbt_tolerance" => eps,
+                                    "absolute_constraint_feas_tolerance" => eps)
     
+    # We have to use a special function xlogx() provided by EAGO.
     EAGO.register_eago_operators!(model)
-    
-    # Define molar fraction of each phase
-    @variable(model, 0 <= x[j=1:M] <= 1)
-    @constraint(model, sum(x[j] for j in 1:M) == 1)
 
-    # Maximum number of sublattices in a phase
-    L = maximum([length(sys.phas[j].cons[1]) for j in 1:M])
+    #
+    # Definition of variables.
+    # 
+    # We define sparse arrays of variables and add constraints for zero elements,
+    # instead of defining as many variables as needed, for the sake of programmability
+    # and readability of the code, assuming the optimizer is very efficient.
+    # 
+    # Y[k]: molar amount of each phase
+    # x[k,i]: molar fraction of component i in phase f
+    # y[k,s,j]: site fraction of a constituent j in sublattice s of phase f
+    #
+    @variable(model, _T)
 
-    # Molar quantity of each phase
-    # mol = [ sum(sys.phas[j].equi) for j in 1:M ]
+    Y_max = [ sum( X[i] for i in 1:I ) / sum( n[k,s] for s in 1:S ) for k in 1:K ]
+    @variable(model, 0 <= Y[k=1:K] <= Y_max[k])
 
-    # Transform an valence vector to a 3D-array for convenience
-    equi = zeros(N,M,L)
-    for i in 1:N, j in 1:M
-        l = length(sys.phas[j].cons[1])
-        for k in 1:l
-            equi[i,j,k] = sys.phas[j].equi[k]
+    x_max = [ sum( n[k,s] for s in 1:S if i in constitution[k][s] ) / sum( n[k,s] for s in 1:S ) for k in 1:K, i in 1:I ]
+    @variable(model, 0 <= x[k=1:K,i=1:I] <= x_max[k,i])
+
+    @variable(model, eps <= y[k=1:K,s=1:S,j=1:J] <= 1)
+
+    # Relationship between molar amount of components and phases
+    for i in 1:I
+        @constraint(model, sum( sum( n[k,s] for s in 1:S ) * Y[k] * x[k,i]  for k in 1:K ) == X[i])
+    end
+
+    # Sum of x[k,i] in each phase equals to unity
+    for k in 1:K
+        @constraint(model, sum( x[k,i] for i in 1:I ) == 1)
+    end
+
+    # Fix site fractions of zero elements to zero
+    for k in 1:K, j in 1:J, s in 1:S
+        if constitution[k][s] == [] || !in(j, constitution[k][s])
+            fix(y[k,s,j], 0, force = true)
         end
     end
 
-    # Define site fraction variable y[i,j,k] where indices i, j, and k
-    # correspond to element, phase, and sublattice, respectively.
-    @variable(model, 1e-7 <= y[i=1:N,j=1:M,k=1:L] <= 1)
-    for j in 1:M
-        cons = sys.phas[j].cons[1]
-        l = length(cons)
-        for k in 1:l
-            @constraint(model, sum( y[i,j,k] for i in 1:N ) == 1)
+    # Sum of y[k,j,s] for all constituents in a sublattice equals to unity.
+    for k in 1:K, s in 1:S
+        if constitution[k][s] ≠ []
+            @constraint(model, sum(y[k,s,j] for j in 1:J) == 1)
         end
     end
 
-    # Fix blank variables as zeros
-    for i in 1:N, j in 1:M, k in 1:L
-        cons = sys.phas[j].cons[1]
-        if k > length(cons) || !(sys.elem[i].name in cons[k])
-            fix(y[i,j,k], 0, force = true)
-        end
-    end
-
-    # Molar constraint on each element
-    for i in 1:N
-        nonzero = [ (j,k) for j in 1:M, k in 1:L if !is_fixed(y[i,j,k]) ]
-        @constraint(model, sum( x[j] * equi[i,j,k] * y[i,j,k] for (j,k) in nonzero ) == X[i])
+    # Relation between mole fractions of components and site fractions
+    for k in 1:K, i in 1:I
+        @constraint(model, x[k,i] == sum( n[k,s] * y[k,s,i] for s in 1:S if constitution[k][s] ≠ [] )
+                                        / sum( n[k,s] for s in 1:S if constitution[k][s] ≠ [] ))
     end
 
     # Gibbs energy contribution from each parameter
-    G_expr = JuMP.NonlinearExpression[]
-    for j in 1:M
-        for para in sys.phas[j].para
-            comb = para.comb
-            ord = para.order
+    G_phase = JuMP.NonlinearExpression[]
+    for k in 1:K
+        G_param = JuMP.NonlinearExpression[]
 
+        m = 0
+        for para in phas[k].para
+            m += 1
+            l = para.order
+
+            # Replace element names with indexes
+            comb = map.(name -> get(cons_id, name, 0), para.comb)
+
+            # Value of the parameter
             funcname = getfuncname(para.name)
             funcsym = Symbol(funcname)
             func = getfield(Calmato, funcsym)
-            funcval = func(T,P)
+            register(model, funcsym, 1, func, autodiff = true)
+            @eval push!($G_param, @NLexpression($model, ($funcsym)($_T)))
 
-            sololatt = findall(latt -> length(latt) == 1, comb)
-            solo = Tuple{Int,Int}[]
-            for k in sololatt
-                i = findfirst(el -> el.name == comb[k][1], sys.elem)
-                if !isnothing(i) && !is_fixed(y[i,j,k])
-                    push!(solo, (i,k))
+            # Solo constituents
+            s_solo = findall(x -> length(x) == 1, comb)
+            solo = [ (s, comb[s][1]) for s in s_solo ]
+            for (s,j) in solo
+                if length(constitution[k][s]) > 1
+                    G_param[m] = @NLexpression(model, G_param[m] * y[k,s,j])
                 end
             end
 
-            S = length(solo)
-            k = findfirst(latt -> length(latt) == 2, comb)
-
-            # 
-            # FIX THIS:
-            # The reason of hardcoding with if-elseif-else is that calling prod() for an empty
-            # collection causes Inf as a return value of the objective function for some reason.
-            # 
-            if isnothing(k)
-                if S > 2
-                    push!(G_expr,
-                          @NLexpression(model, funcval * x[j] * prod( y[i,j,k] for (i,k) in solo )))
-                elseif S == 1
-                    i, k = solo[1]
-                    push!(G_expr, @NLexpression(model, funcval * x[j] * y[i,j,k]))
-                else
-                    @assert S == 0
-                    push!(G_expr, @NLexpression(model, funcval * x[j]))
-                end
-            else
-                i₁, i₂ = [ findfirst(el -> el.name == elem, sys.elem) for elem in comb[k] ]
-                if S > 2
-                    push!(G_expr, @NLexpression(model, funcval * x[j] * prod( y[i,j,k] for (i,k) in solo )
-                                                       * y[i₁,j,k] * y[i₂,j,k] * ( y[i₁,j,k] - y[i₂,j,k] )^ord))
-                elseif S == 1
-                    iₛ, kₛ = solo[1]
-                    push!(G_expr, @NLexpression(model, funcval * x[j] * y[iₛ,j,kₛ]
-                                                       * y[i₁,j,k] * y[i₂,j,k] * ( y[i₁,j,k] - y[i₂,j,k] )^ord))
-                else
-                    @assert S == 0
-                    push!(G_expr, @NLexpression(model, funcval * x[j]
-                                                       * y[i₁,j,k] * y[i₂,j,k] * ( y[i₁,j,k] - y[i₂,j,k] )^ord))
+            # Paired constituents
+            s_duo = findall(latt -> length(latt) == 2, comb)
+            @assert length(s_duo) ≤ 1
+            if length(s_duo) == 1
+                s = s_duo[1]
+                i = comb[s][1]
+                j = comb[s][2]
+                G_param[m] = @NLexpression(model, G_param[m] * y[k,s,i] * y[k,s,j])
+                for ν in 1:l 
+                    G_param[m] = @NLexpression(model, G_param[m] * (y[k,s,i] - y[k,s,j]))
                 end
             end
         end
+
+        push!(G_phase, @NLexpression(model, sum(G_param[i] for i in 1:m)))
+
+        G_phase[k] = @NLexpression(model, G_phase[k] + R*_T*sum( n[k,s]*xlogx(y[k,s,j])
+                                            for s in 1:S, j in 1:J if j in constitution[k][s] && length(constitution[k][s]) > 1 ))
     end
 
-    # Ideal entropy of mixing
-    for i in 1:N, j in 1:M, k in 1:L
-        if !is_fixed(y[i,j,k])
-            push!(G_expr, @NLexpression(model, x[j] * equi[i,j,k] * R*T * xlogx(y[i,j,k])))
-        end
-    end
+    @NLobjective(model, Min, sum(Y[k]*G_phase[k] for k in 1:K))
 
-    @NLobjective(model, Min, sum(G_expr[i] for i in 1:length(G_expr)))
-
-    println(model)
+    set_lower_bound(_T, T)
+    set_upper_bound(_T, T)
 
     optimize!(model)
 
-    return EquilibResult(sys, [ value(x[j]) for j in 1:M ],
-                              [ value(y[i,j,k]) for i in 1:N, j in 1:M, k in 1:L ])
+    return EquilibResult(sys, X, [ value(Y[k]) for k in 1:K ],
+                                 [ value(x[k,i]) for k in 1:K, i in 1:I ],
+                                 [ value(y[k,s,j]) for k in 1:K, s in 1:S, j in 1:J ])
 end

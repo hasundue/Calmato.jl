@@ -134,7 +134,7 @@ function parse_function(name::AbstractString, strs::Vector{SubString{String}}, f
     end
 
     N = length(funcstr)
-    str = "function $(name)(T,P)\n"
+    str = "function $(name)(T)::typeof(T)\n"
     for i in 1:N
         for pair in ["LN(" => "log(", "**" => "^", ".+" => ".0+", ".-" => ".0-", ".*" => ".0*", "./" => ".0/"]
             funcstr[i] = replace(funcstr[i], pair)
@@ -144,10 +144,12 @@ function parse_function(name::AbstractString, strs::Vector{SubString{String}}, f
         str *= i == 1 ? "\tif " : "\telseif "
         str *= "$(T[i]) ≤ T ≤ $(T[i+1])\n"
         for func in funcs
-            funcstr[i] = replace(funcstr[i], func.name => "$(func.name)(T,P)")
+            funcstr[i] = replace(funcstr[i], func.name => "$(func.name)(T)")
         end
         str *= "\t\t" * funcstr[i] * "\n"
     end
+    str *= "\telseif T ≤ $(T[1])\n\t\t$(funcstr[1])\n"
+    str *= "\telseif T ≥ $(T[end])\n\t\t$(funcstr[end])\n"
     str *= "\tend\nend\n"
     return str
 end
@@ -239,8 +241,9 @@ function Base.print(db::Database)
 
     nphas = length(db.phas)
     println("\tPhases: $nphas")
-    for phas in db.phas
-        print("\t\t$(phas.name); ")
+    for k in 1:nphas
+        phas = db.phas[k]
+        print("\t\t$k: $(phas.name); ")
         cons = phas.cons
         nlatt = length(cons)
         for i in 1:nlatt

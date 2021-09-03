@@ -1,5 +1,7 @@
 module Calmato
 
+using Printf
+
 using JuMP
 import EAGO
 
@@ -7,7 +9,8 @@ export read_tdb
 export init_system
 export equilib
 
-const R = 8.314 # gas constant
+const R = 8.3144598 # gas constant
+const P = 1.0 # pressure
 
 include("database.jl")
 include("system.jl")

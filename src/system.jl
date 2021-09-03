@@ -19,7 +19,7 @@ function init_system(db::Database, elem::Vector{Element}, phas::Vector{<:Phase})
             eval(Meta.parse(pr.func))
         end
     end
-    return System(elem, phas)
+    return System(elem, deepcopy(phas))
 end
 
 function init_system(db::Database)
