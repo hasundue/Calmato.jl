@@ -64,8 +64,6 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15; eps = 2e-8)
         end
     end
 
-    @debug print(model)
-
     optimize!(model)
 
     return EquilibResult(sys, X, [ value(Y[k]) for k in 1:K ],
