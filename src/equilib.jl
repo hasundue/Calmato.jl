@@ -26,7 +26,7 @@ function Base.display(res::EquilibResult)
     end
 end
 
-function equilib(sys::System, X = equiatom(sys), T = 298.15; eps = 1e-7)
+function equilib(sys::System, X = equiatom(sys), T = 298.15; eps = 2e-8)
     elem = sys.elem
     phas = sys.phas
 
@@ -63,20 +63,56 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15; eps = 1e-7)
 
     # Number of sites on sublattice s in phase f, n[f,s]
     n = [ phas[k].equi[s] for k in 1:K, s in 1:S ]
+
+    #
+    # GLPK as the lower solver in EAGO
+    #
+    glpk = GLPK.Optimizer()
+
+    @debug begin
+        MOI.set(glpk, MOI.RawParameter("msg_lev"), 3)
+        "Enabled GLPK debugging"
+    end
+
+    #
+    # Ipopt as the upper solver in EAGO
+    #
+    ipopt = EAGO.default_nlp_solver()
+
+    MOI.set(ipopt, MOI.RawParameter("tol"), 1e-3)
+    MOI.set(ipopt, MOI.RawParameter("acceptable_iter"), 1)
+    MOI.set(ipopt, MOI.RawParameter("max_iter"), 100)
+
+    @debug begin
+        MOI.set(ipopt, MOI.RawParameter("print_level"), 5)
+        "Enabled Ipopt debugging"
+    end
     
     #
     # EAGO Optimizer
     #
-    model = Model(EAGO.Optimizer)
-    set_optimizer_attributes(model, "verbosity" => 1,
-                                    "output_iterations" => 1,
-                                    "iteration_limit" => 1000,
-                                    "absolute_tolerance" => 1e-3,
-                                    "relative_tolerance" => 1e-3,
-                                    "obbt_tolerance" => eps,
-                                    "dbbt_tolerance" => eps,
-                                    "absolute_constraint_feas_tolerance" => eps)
-    
+    model = Model(optimizer_with_attributes(EAGO.Optimizer,
+        "relaxed_optimizer" => glpk,
+        "upper_optimizer" => ipopt,
+        "verbosity" => 0,
+        "output_iterations" => 1,
+        "iteration_limit" => 2,
+        "obbt_depth" => 0,
+        # "dbbt_depth" => 0,
+        # "absolute_tolerance" => 1e-3,
+        # "relative_tolerance" => 1e-3,
+        # "obbt_tolerance" => eps,
+        # "dbbt_tolerance" => eps,
+        # "absolute_constraint_feas_tolerance" => eps,
+        # "domain_violation_guard_on" => false,
+        # "domain_violation_ϵ" => eps,
+    ))
+
+    @debug begin
+        set_optimizer_attributes(model, "verbosity" => 5)
+        "Enabled EAGO debugging"
+    end
+
     # We have to use a special function xlogx() provided by EAGO.
     EAGO.register_eago_operators!(model)
 
@@ -94,7 +130,7 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15; eps = 1e-7)
     @variable(model, _T)
 
     Y_max = [ sum( X[i] for i in 1:I ) / sum( n[k,s] for s in 1:S ) for k in 1:K ]
-    @variable(model, 0 <= Y[k=1:K] <= Y_max[k])
+    @variable(model, eps <= Y[k=1:K] <= Y_max[k])
 
     x_max = [ sum( n[k,s] for s in 1:S if i in constitution[k][s] ) / sum( n[k,s] for s in 1:S ) for k in 1:K, i in 1:I ]
     @variable(model, 0 <= x[k=1:K,i=1:I] <= x_max[k,i])
@@ -112,8 +148,8 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15; eps = 1e-7)
     end
 
     # Fix site fractions of zero elements to zero
-    for k in 1:K, j in 1:J, s in 1:S
-        if constitution[k][s] == [] || !in(j, constitution[k][s])
+    for k in 1:K, s in 1:S, j in 1:J
+        if !in(j, constitution[k][s])
             fix(y[k,s,j], 0, force = true)
         end
     end
@@ -176,7 +212,7 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15; eps = 1e-7)
 
         push!(G_phase, @NLexpression(model, sum(G_param[i] for i in 1:m)))
 
-        G_phase[k] = @NLexpression(model, G_phase[k] + R*_T*sum( n[k,s]*xlogx(y[k,s,j])
+        G_phase[k] = @NLexpression(model, G_phase[k] + R*_T*sum( n[k,s] * xlogx(y[k,s,j])
                                             for s in 1:S, j in 1:J if j in constitution[k][s] && length(constitution[k][s]) > 1 ))
     end
 
@@ -184,6 +220,8 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15; eps = 1e-7)
 
     set_lower_bound(_T, T)
     set_upper_bound(_T, T)
+
+    @debug model
 
     optimize!(model)
 

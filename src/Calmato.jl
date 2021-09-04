@@ -4,6 +4,8 @@ using Printf
 
 using JuMP
 import EAGO
+import GLPK
+import MathOptInterface as MOI
 
 export read_tdb
 export init_system
