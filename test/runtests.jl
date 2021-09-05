@@ -5,7 +5,6 @@ using Test
     @testset "Database" begin
         db = read_tdb(joinpath("tdb", "cuzn_liang.tdb"))
         print(db)
-        print_func(db)
     end
     @testset "Equilib" begin
         sys = init_system(db)
