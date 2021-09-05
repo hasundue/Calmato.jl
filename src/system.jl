@@ -1,10 +1,3 @@
-"""
-Notations follow from:
-
-Sundman, B., Chen, Q. & Du, Y. A Review of Calphad Modeling of Ordered Phases. J. Phase Equilib. Diffus. 39, 678–693 (2018).  https://doi.org/10.1007/s11669-018-0671-y
-
-"""
-
 struct System
     elem::Vector{Element}
     phas::Vector{Phase}
