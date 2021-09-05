@@ -104,12 +104,6 @@ function init_system(db::Database, elem::Vector{Element}, phas::Vector{<:Phase};
         "obbt_depth" => 0,
         "dbbt_tolerance" => eps,
         "absolute_constraint_feas_tolerance" => eps,
-        # "obbt_tolerance" => eps,
-        # "dbbt_depth" => 0,
-        # "absolute_tolerance" => 1e-3,
-        # "relative_tolerance" => 1e-3,
-        # "domain_violation_guard_on" => false,
-        # "domain_violation_ϵ" => eps,
     ))
 
     @debug begin
