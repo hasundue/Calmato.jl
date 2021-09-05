@@ -13,10 +13,10 @@ struct System
     nphas::Int # number of phases
     nlatt::Int # maximum number of sublattices in a phase
     nsite::Matrix{Int} # number of sites in each sublattice
-    model::Model
+    model::Model # JuMP model
 end
 
-function init_system(db::Database, elem::Vector{Element}, phas::Vector{<:Phase})
+function init_system(db::Database, elem::Vector{Element}, phas::Vector{<:Phase}; eps = 2e-8)
     # We do this because we modify Phase structs destructively
     phas = deepcopy(phas)
 
@@ -65,20 +65,27 @@ function init_system(db::Database, elem::Vector{Element}, phas::Vector{<:Phase})
     # GLPK as the lower solver in EAGO
     #
     glpk = GLPK.Optimizer()
+    MOI.set(glpk, MOI.RawParameter("meth"), 2)
+    MOI.set(glpk, MOI.RawParameter("tol_bnd"), 1e-3)
+    MOI.set(glpk, MOI.RawParameter("tol_dj"), 1e-3)
+    MOI.set(glpk, MOI.RawParameter("tol_piv"), 1e-5)
 
     @debug begin
-        MOI.set(glpk, MOI.RawParameter("msg_lev"), 3)
+        MOI.set(glpk, MOI.RawParameter("msg_lev"), 4) # GLP_MSG_ALL
+        MOI.set(glpk, MOI.RawParameter("out_frq"), 1) # GLP_MSG_ALL
         "Enabled GLPK debugging"
     end
 
     #
     # Ipopt as the upper solver in EAGO
     #
-    ipopt = EAGO.default_nlp_solver()
+    ipopt = Ipopt.Optimizer()
 
     MOI.set(ipopt, MOI.RawParameter("tol"), 1e-3)
-    MOI.set(ipopt, MOI.RawParameter("acceptable_iter"), 1)
+    MOI.set(ipopt, MOI.RawParameter("dual_inf_tol"), 1e+2)
+    MOI.set(ipopt, MOI.RawParameter("constr_viol_tol"), eps)
     MOI.set(ipopt, MOI.RawParameter("max_iter"), 100)
+    MOI.set(ipopt, MOI.RawParameter("print_level"), 0)
 
     @debug begin
         MOI.set(ipopt, MOI.RawParameter("print_level"), 5)
@@ -93,14 +100,14 @@ function init_system(db::Database, elem::Vector{Element}, phas::Vector{<:Phase})
         "upper_optimizer" => ipopt,
         "verbosity" => 0,
         "output_iterations" => 1,
-        "iteration_limit" => 2,
+        "iteration_limit" => 3,
         "obbt_depth" => 0,
+        "dbbt_tolerance" => eps,
+        "absolute_constraint_feas_tolerance" => eps,
+        # "obbt_tolerance" => eps,
         # "dbbt_depth" => 0,
         # "absolute_tolerance" => 1e-3,
         # "relative_tolerance" => 1e-3,
-        # "obbt_tolerance" => eps,
-        # "dbbt_tolerance" => eps,
-        # "absolute_constraint_feas_tolerance" => eps,
         # "domain_violation_guard_on" => false,
         # "domain_violation_ϵ" => eps,
     ))
@@ -128,12 +135,12 @@ function init_system(db::Database, elem::Vector{Element}, phas::Vector{<:Phase})
     @variable(model, _T)
     @variable(model, _X[i=1:I] >= 0)
 
-    @variable(model, Y[k=1:K])
+    @variable(model, Y[k=1:K] >= eps)
 
     x_max = [ sum( n[k,s] for s in 1:S if i in constitution[k][s] ) / sum( n[k,s] for s in 1:S ) for k in 1:K, i in 1:I ]
     @variable(model, 0 <= x[k=1:K,i=1:I] <= x_max[k,i])
 
-    @variable(model, y[k=1:K,s=1:S,j=1:J] <= 1)
+    @variable(model, eps <= y[k=1:K,s=1:S,j=1:J] <= 1)
 
     # Relationship between molar amount of components and phases
     for i in 1:I
@@ -221,7 +228,7 @@ function init_system(db::Database, elem::Vector{Element}, phas::Vector{<:Phase})
     return System(elem, phas, I, J, K, S, n, model)
 end
 
-function init_system(db::Database)
+function init_system(db::Database; eps = 2e-8)
     elem = Vector{Element}()
     phas = Vector{Phase}()
 
@@ -241,7 +248,7 @@ function init_system(db::Database)
         push!(elem, el)
     end
 
-    return init_system(db, elem, phas)
+    return init_system(db, elem, phas, eps = eps)
 end
 
 function equiatom(sys::System)

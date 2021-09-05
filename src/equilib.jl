@@ -26,7 +26,7 @@ function Base.display(res::EquilibResult)
     end
 end
 
-function equilib(sys::System, X = equiatom(sys), T = 298.15; eps = 2e-8)
+function equilib(sys::System, X = equiatom(sys), T = 298.15)
     # JuMP model
     model = sys.model
 
@@ -44,7 +44,7 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15; eps = 2e-8)
     y = model[:y] # site fraction in each sublattice
 
     # Fix temperature, T
-    # TODO: Using fix() results in not obtaining a solution for some reason
+    # TODO: Using fix() results in calling f(T) at T = 0 for some reason
     set_lower_bound(_T, T)
     set_upper_bound(_T, T)
 
@@ -56,11 +56,9 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15; eps = 2e-8)
     # Set lower and lower bounds for variables
     Y_max = [ sum( X[i] for i in 1:I ) / sum( n[k,s] for s in 1:S ) for k in 1:K ]
     for k in 1:K
-        set_lower_bound(Y[k], eps)
         set_upper_bound(Y[k], Y_max[k])
         for s in 1:S, j in 1:J
             is_fixed(y[k,s,j]) && continue
-            set_lower_bound(y[k,s,j], eps)
         end
     end
 
