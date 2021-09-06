@@ -66,7 +66,9 @@ function constitutionstring(phas::Phase)
     S = length(phas.cons)
     str = ""
     for s in 1:S
-        str *= constitutionstring(phas, s)
+        if phas.cons[s] ≠ []
+            str *= constitutionstring(phas, s)
+        end
     end
     return str
 end
