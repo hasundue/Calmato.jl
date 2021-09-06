@@ -18,7 +18,9 @@ function Base.display(res::EquilibResult)
         S = length(phas.cons)
         for s in 1:S
             phas.cons[s] == [] && continue
-            println("\tsublattice $s")
+            if length(filter(l -> l ≠ [], phas.cons)) > 1
+                println("\tSublattice " * constitutionstring(phas, s))
+            end
             for j in 1:I
                 consname = res.sys.elems[j].name
                 @printf "\t\t%s: %.4f\n" consname res.y[k,s,j]
