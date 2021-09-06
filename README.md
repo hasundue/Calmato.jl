@@ -105,13 +105,14 @@ Eps: 0.24864 mol
 Calculation of equlibirum solidification, or the temperature dependence of phase constitution:
 
 ```julia
-res = solidify(sys, X)
+Ts = 600:10:1200
+res = solidify(sys, X, Ts)
 ```
 
 ```terminal
 Solidification:
-        298.15 ≤ T ≤ 1698.15
-        14 calculations
+        600 ≤ T ≤ 1200
+        61 calculations
 ```
 
 Calmato currently support Plots for visualization of results:
