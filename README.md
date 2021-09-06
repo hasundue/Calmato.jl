@@ -49,13 +49,13 @@ Database:
                 GFCCZN
                 A1BCZ
         Phases: 8
-                1: Liquid; (Cu,Zn)1
+                1: Liquid; (Cu,Zn)
                         G(Cu;0)
                         G(Zn;0)
                         L(Cu,Zn;0)
                         L(Cu,Zn;1)
                         L(Cu,Zn;2)
-                2: Bcc; (Cu,Zn)1
+                2: Bcc; (Cu,Zn)
                         G(Cu;0)
                         G(Zn;0)
                         L(Cu,Zn;0)
@@ -88,17 +88,16 @@ equilib(sys, X, T)
 
 ```terminal
 Gamma: 0.02890 mol
-        sublattice 1
+        Sublattice (Cu)4
                 Cu: 1.0000
                 Zn: 0.0000
-        sublattice 2
+        Sublattice (Cu,Zn)6
                 Cu: 0.7363
                 Zn: 0.2637
-        sublattice 3
+        Sublattice (Cu,Zn)16
                 Cu: 0.0007
                 Zn: 0.9993
 Eps: 0.24864 mol
-        sublattice 1
                 Cu: 0.2269
                 Zn: 0.7731
 ```
