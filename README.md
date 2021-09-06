@@ -3,13 +3,13 @@
 [![CI](https://github.com/hasundue/Calmato.jl/workflows/CI/badge.svg)](https://github.com/hasundue/Calmato.jl/actions?query=workflow%3ACI)
 [![Codecov](https://codecov.io/gh/hasundue/Calmato.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/hasundue/Calmato.jl)
 
-**Calmato** is an open-source CALPHAD (CALculation of PHAse Diagrams) package in Julia language, which utilizes [**EAGO**](https://github.com/PSORLab/EAGO.jl) as its optimization engine. The package is still in the alpha stage of development and has limited functionality and reliability.
+**Calmato** is an open-source CALPHAD (CALculation of PHAse Diagrams) package in Julia language, which uses [**EAGO**](https://github.com/PSORLab/EAGO.jl) as its optimization engine. The package is still in the alpha stage of development and has limited functionality and reliability.
 
 ## Example
 
-Let's take Cu-Zn system assesed by [Liang et al. (2015)](https://www.sciencedirect.com/science/article/abs/pii/S0364591615300250) as an example.
+Let's take the Cu-Zn system assesed by [Liang et al. (2015)](https://www.sciencedirect.com/science/article/abs/pii/S0364591615300250) as an example.
 
-Read a tdb file:
+Read the tdb file, which can be downloaded from [TDB DB](https://avdwgroup.engin.brown.edu/):
 
 ```julia
 using Calmato
@@ -65,7 +65,7 @@ Database:
                         ...
 ```
 
-Initialize a system. The init_system function automatically choose all the element in the database except for electron gas (/-) and vacancy (VA) as components of the system:
+Initialize a system:
 
 ```julia
 sys = init_system(db)
@@ -76,6 +76,7 @@ System:
         Elements: 2
         Phases: 7
 ```
+The init_system function automatically choose all the elements in the database except for electron gas (/-) and vacancy (VA) as components of the system:
 
 Point calculation of an equilibrium state:
 
