@@ -1,12 +1,14 @@
 struct Element
     name::AbstractString
-    phase::AbstractString
-    param::Vector{Float64}
+    refstate::AbstractString # reference state
+    mass::Float64
+    H298::Float64
+    S298::Float64
 end
 
 struct GFunction
     name::AbstractString
-    func::AbstractString
+    funcstr::AbstractString
 end
 
 struct Parameter
@@ -14,7 +16,7 @@ struct Parameter
     symbol::Char
     comb::Vector{Vector{AbstractString}}
     order::Int
-    func::AbstractString
+    funcstr::AbstractString
 end
 
 const Constitution = Vector{Vector{AbstractString}}
@@ -22,70 +24,70 @@ const Constitution = Vector{Vector{AbstractString}}
 mutable struct Phase{T<:Real}
     name::AbstractString
     state::Char
-    model::AbstractString
-    equi::Vector{T}
+    type::AbstractString
+    sites::Vector{T}
     cons::Constitution
-    para::Vector{Parameter}
+    params::Vector{Parameter}
 
     function Phase(name::AbstractString,
                    state::Char,
-                   model::AbstractString,
-                   equi::Vector{T}) where T <: Real
-        ph = new{T}()
-        ph.name = name
-        ph.state = state
-        ph.model = model
-        ph.equi = equi
-        ph.para = Parameter[]
-        return ph
+                   type::AbstractString,
+                   sites::Vector{T}) where T <: Real
+        phas = new{T}()
+        phas.name = name
+        phas.state = state
+        phas.type = type
+        phas.sites = sites
+        phas.params = Parameter[]
+        return phas
     end
 end
 
 struct Database
-    elem::Vector{Element}
-    func::Vector{GFunction}
-    phas::Vector{Phase}
+    elems::Vector{Element}
+    funcs::Vector{GFunction}
+    phass::Vector{Phase}
 end
 
 function read_tdb(tdb::AbstractString)
-    elem = Vector{Element}()
-    func = Vector{GFunction}()
-    phas = Vector{Phase}()
+    elems = Vector{Element}()
+    funcs = Vector{GFunction}()
+    phass = Vector{Phase}()
 
     open(tdb, "r") do io
         while !eof(io)
             block = readuntil(io, '!')
 
-            for type in [" ELEMENT ", "Function", "Phase", "Constituent", "Parameter"]
-                range = findfirst(type, block)
+            for keyword in [" ELEMENT ", "Function", "Phase", "Constituent", "Parameter"]
+                range = findfirst(keyword, block)
                 if range ≠ nothing
                     text = block[first(range):end]
-                    if type == " ELEMENT "
-                        el = parse_element(text)
-                        push!(elem, el)
-                    elseif type == "Function"
-                        fn = parse_gfunction(text, func)
-                        push!(func, fn)
-                    elseif type == "Phase"
-                        ph = parse_phase(text)
-                        push!(phas, ph)
-                    elseif type == "Constituent"
-                        phasname, cn = parse_constituent(text)
-                        ph = filter(ph -> ph.name == phasname, phas)
-                        @assert length(ph) == 1
-                        ph[1].cons = cn
-                    elseif type == "Parameter"
-                        phasname, pr = parse_parameter(text, func)
-                        ph = filter(ph -> ph.name == phasname, phas)
-                        @assert length(ph) == 1
-                        push!(ph[1].para, pr)
+                    if keyword == " ELEMENT "
+                        elem = parse_element(text)
+                        push!(elems, elem)
+                    elseif keyword == "Function"
+                        func = parse_gfunction(text, funcs)
+                        push!(funcs, func)
+                    elseif keyword == "Phase"
+                        phas = parse_phase(text)
+                        push!(phass, phas)
+                    elseif keyword == "Constituent"
+                        phasname, cons = parse_constituent(text)
+                        phas = filter(phas -> phas.name == phasname, phass)
+                        @assert length(phas) == 1
+                        phas[1].cons = cons
+                    elseif keyword == "Parameter"
+                        phasname, param = parse_parameter(text, funcs)
+                        phas = filter(phas -> phas.name == phasname, phass)
+                        @assert length(phas) == 1
+                        push!(phas[1].params, param)
                     end
                 end
             end
         end
     end
 
-    return Database(elem, func, phas)
+    return Database(elems, funcs, phass)
 end
 
 function parse_element(text::AbstractString)
@@ -93,34 +95,34 @@ function parse_element(text::AbstractString)
     @assert length(strs) == 6
     @assert strs[1] == "ELEMENT"
     name = strs[2]
-    phase = strs[3]
-    param = parse.(Float64, strs[4:6])
-    return Element(name, phase, param)
+    refstate = strs[3]
+    mass, H298, S298 = parse.(Float64, strs[4:6])
+    return Element(name, refstate, mass, H298, S298)
 end
 
 function parse_gfunction(text::AbstractString, funcs::Vector{GFunction})
     strs = split(text)
     @assert strs[1] == "Function"
     name = strs[2]
-    func = parse_function(name, strs[3:end], funcs)
-    return GFunction(name, func)
+    funcstr = parse_function(name, strs[3:end], funcs)
+    return GFunction(name, funcstr)
 end
 
 function parse_function(name::AbstractString, strs::Vector{SubString{String}}, funcs::Vector{GFunction})
-    T = Vector{AbstractString}()
-    funcstr = Vector{AbstractString}()
+    Ts = Vector{AbstractString}()
+    funcstrs = Vector{AbstractString}()
 
-    push!(T, strs[1])
+    push!(Ts, strs[1])
     k = 2
 
     while true
-        push!(funcstr, strs[k])
+        push!(funcstrs, strs[k])
         k += 1
-        while isnothing(findfirst(';', funcstr[end]))
-            funcstr[end] = funcstr[end] * strs[k]
+        while isnothing(findfirst(';', funcstrs[end]))
+            funcstrs[end] = funcstrs[end] * strs[k]
             k += 1
         end
-        push!(T, strs[k])
+        push!(Ts, strs[k])
         k += 1
         if strs[k] == "N"
             k += 1
@@ -133,23 +135,23 @@ function parse_function(name::AbstractString, strs::Vector{SubString{String}}, f
         end
     end
 
-    N = length(funcstr)
+    N = length(funcstrs)
     str = "function $(name)(T)::typeof(T)\n"
     for i in 1:N
         for pair in ["T*LN(T)" => "McCormick.xlogx(T)", "LN(" => "log(", "**" => "^", ".+" => ".0+", ".-" => ".0-", ".*" => ".0*", "./" => ".0/"]
-            funcstr[i] = replace(funcstr[i], pair)
+            funcstrs[i] = replace(funcstrs[i], pair)
         end
-        funcstr[i] = strip(funcstr[i], ';')
+        funcstrs[i] = strip(funcstrs[i], ';')
 
         str *= i == 1 ? "\tif " : "\telseif "
-        str *= "$(T[i]) ≤ T ≤ $(T[i+1])\n"
+        str *= "$(Ts[i]) ≤ T ≤ $(Ts[i+1])\n"
         for func in funcs
-            funcstr[i] = replace(funcstr[i], func.name => "$(func.name)(T)")
+            funcstrs[i] = replace(funcstrs[i], func.name => "$(func.name)(T)")
         end
-        str *= "\t\t" * funcstr[i] * "\n"
+        str *= "\t\t" * funcstrs[i] * "\n"
     end
-    str *= "\telseif T ≤ $(T[1])\n\t\t$(funcstr[1])\n"
-    str *= "\telseif T ≥ $(T[end])\n\t\t$(funcstr[end])\n"
+    str *= "\telseif T ≤ $(Ts[1])\n\t\t$(funcstrs[1])\n"
+    str *= "\telseif T ≥ $(Ts[end])\n\t\t$(funcstrs[end])\n"
     str *= "\tend\nend\n"
     return str
 end
@@ -171,23 +173,23 @@ function parse_phase(text::AbstractString)
 end
 
 function parse_constituent(text::AbstractString)
-    vect = split(text)
-    @assert vect[1] == "Constituent"
-    phas = split(vect[2], ':')[1] # "Liquid:L", "Bcc", "Fcc", etc.
-    cons_text = vect[3] # ":Cu,Zn", ":Cu,Zn:Cu,Zn:", etc.
-    cons_vect = split(cons_text, ':')
-    cons_vect = filter(e -> e ≠ "", cons_vect)
-    cons = map(text -> split(text, ','), cons_vect)
+    strs = split(text)
+    @assert strs[1] == "Constituent"
+    phas = split(strs[2], ':')[1] # "Liquid:L", "Bcc", "Fcc", etc.
+    cons_text = strs[3] # ":Cu,Zn", ":Cu,Zn:Cu,Zn:", etc.
+    cons_strs = split(cons_text, ':')
+    cons_strs = filter(e -> e ≠ "", cons_strs)
+    cons = map(text -> split(text, ','), cons_strs)
     return phas, cons
 end
 
 function parse_parameter(text::AbstractString, funcs::Vector{GFunction})
     # Parameters
-    vect = split(text)
-    @assert vect[1] == "Parameter"
+    strs = split(text)
+    @assert strs[1] == "Parameter"
 
     # L(Liquid,Cu,Zn;0), etc.
-    text = vect[2]
+    text = strs[2]
     name = text
     funcname = getfuncname(text)
     symbol = text[1]
@@ -200,8 +202,8 @@ function parse_parameter(text::AbstractString, funcs::Vector{GFunction})
     comb_text, order_text = split(text, ';')
     comb = map(text -> split(text, ','), split(comb_text, ':'))
     order = parse(Int, order_text)
-    func = parse_function(funcname, vect[3:end], funcs)
-    return phas, Parameter(name, symbol, comb, order, func)
+    funcstr = parse_function(funcname, strs[3:end], funcs)
+    return phas, Parameter(name, symbol, comb, order, funcstr)
 end
 
 function getfuncname(str::AbstractString)

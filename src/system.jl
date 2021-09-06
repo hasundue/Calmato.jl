@@ -9,50 +9,50 @@ struct System
     model::Model # JuMP model
 end
 
-function init_system(db::Database, elem::Vector{Element}, phas::Vector{<:Phase}; eps = 2e-8)
+function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase}; eps = 2e-8)
     # We do this because we modify Phase structs destructively
-    phas = deepcopy(phas)
+    phass = deepcopy(phass)
 
     # Evaluate parsed CALPHAD functions and define them as Julia functions
-    for fn in db.func
-        eval(Meta.parse(fn.func))
+    for func in db.funcs
+        eval(Meta.parse(func.funcstr))
     end
-    for ph in phas
-        for pr in ph.para
-            eval(Meta.parse(pr.func))
+    for phas in phass
+        for param in phas.params
+            eval(Meta.parse(param.funcstr))
         end
     end
 
     # TODO: Consitituents are identical to components in the current version of Calmato.
-    cons = elem
+    conss = elems
 
-    I = length(elem) # number of components
-    J = length(cons) # number of constituents
-    K = length(phas) # number of phases
+    I = length(elems) # number of components
+    J = length(conss) # number of constituents
+    K = length(phass) # number of phases
 
     # Maximum number of sublattices in a phase
-    S = maximum([ length(phas[k].cons) for k in 1:K ])
+    S = maximum([ length(phass[k].cons) for k in 1:K ])
 
     # Indexing constituent
-    cons_id = Dict{AbstractString,Int}()
+    cons_ids = Dict{AbstractString,Int}()
     for j in 1:J
-        push!(cons_id, cons[j].name => j)
+        push!(cons_ids, conss[j].name => j)
     end
 
     # Put zero or empty elements in each sublattice for later use
     for k in 1:K
-        @assert length(phas[k].equi) == length(phas[k].cons)
-        while length(phas[k].equi) < S
-            push!(phas[k].equi, zero(Int))
-            push!(phas[k].cons, Vector{Int}[])
+        @assert length(phass[k].sites) == length(phass[k].cons)
+        while length(phass[k].sites) < S
+            push!(phass[k].sites, zero(Int))
+            push!(phass[k].cons, Vector{Int}[])
         end
     end
 
     # Reconstuction of constitution vector into an array of Int
-    constitution = [ map.(name -> get(cons_id, name, 0), phas[k].cons) for k in 1:K ]
+    constitution = [ map.(name -> get(cons_ids, name, 0), phass[k].cons) for k in 1:K ]
 
     # Number of sites on sublattice s in phase f, n[f,s]
-    n = [ phas[k].equi[s] for k in 1:K, s in 1:S ]
+    n = [ phass[k].sites[s] for k in 1:K, s in 1:S ]
 
     #
     # GLPK as the lower solver in EAGO
@@ -160,31 +160,31 @@ function init_system(db::Database, elem::Vector{Element}, phas::Vector{<:Phase};
     end
 
     # Gibbs energy contribution from each parameter
-    G_phase = JuMP.NonlinearExpression[]
+    Gs_phase = JuMP.NonlinearExpression[]
     for k in 1:K
-        G_param = JuMP.NonlinearExpression[]
+        Gs_param = JuMP.NonlinearExpression[]
 
         m = 0
-        for para in phas[k].para
+        for param in phass[k].params
             m += 1
-            l = para.order
+            l = param.order
 
             # Replace element names with indexes
-            comb = map.(name -> get(cons_id, name, 0), para.comb)
+            comb = map.(name -> get(cons_ids, name, 0), param.comb)
 
             # Value of the parameter
-            funcname = getfuncname(para.name)
+            funcname = getfuncname(param.name)
             funcsym = Symbol(funcname)
             func = getfield(Calmato, funcsym)
             register(model, funcsym, 1, func, autodiff = true)
-            @eval push!($G_param, @NLexpression($model, ($funcsym)($_T)))
+            @eval push!($Gs_param, @NLexpression($model, ($funcsym)($_T)))
 
             # Solo constituents
             s_solo = findall(x -> length(x) == 1, comb)
             solo = [ (s, comb[s][1]) for s in s_solo ]
             for (s,j) in solo
                 if length(constitution[k][s]) > 1
-                    G_param[m] = @NLexpression(model, G_param[m] * y[k,s,j])
+                    Gs_param[m] = @NLexpression(model, Gs_param[m] * y[k,s,j])
                 end
             end
 
@@ -195,47 +195,47 @@ function init_system(db::Database, elem::Vector{Element}, phas::Vector{<:Phase};
                 s = s_duo[1]
                 i = comb[s][1]
                 j = comb[s][2]
-                G_param[m] = @NLexpression(model, G_param[m] * y[k,s,i] * y[k,s,j])
+                Gs_param[m] = @NLexpression(model, Gs_param[m] * y[k,s,i] * y[k,s,j])
                 for ν in 1:l 
-                    G_param[m] = @NLexpression(model, G_param[m] * (y[k,s,i] - y[k,s,j]))
+                    Gs_param[m] = @NLexpression(model, Gs_param[m] * (y[k,s,i] - y[k,s,j]))
                 end
             end
         end
 
-        push!(G_phase, @NLexpression(model, sum(G_param[i] for i in 1:m)))
+        push!(Gs_phase, @NLexpression(model, sum(Gs_param[i] for i in 1:m)))
 
-        G_phase[k] = @NLexpression(model, G_phase[k] + R*_T*sum( n[k,s] * xlogx(y[k,s,j])
-                                            for s in 1:S, j in 1:J if j in constitution[k][s] && length(constitution[k][s]) > 1 ))
+        Gs_phase[k] = @NLexpression(model, Gs_phase[k] + R*_T*sum( n[k,s] * xlogx(y[k,s,j])
+            for s in 1:S, j in 1:J if j in constitution[k][s] && length(constitution[k][s]) > 1 ))
     end
 
-    @NLobjective(model, Min, sum(Y[k]*G_phase[k] for k in 1:K))
+    @NLobjective(model, Min, sum(Y[k]*Gs_phase[k] for k in 1:K))
 
     @debug model
 
-    return System(elem, phas, I, J, K, S, n, model)
+    return System(elems, phass, I, J, K, S, n, model)
 end
 
 function init_system(db::Database; eps = 2e-8)
-    elem = Vector{Element}()
-    phas = Vector{Phase}()
+    elems = Vector{Element}()
+    phass = Vector{Phase}()
 
-    for ph in db.phas
-        if 'O' in ph.model
+    for ph in db.phass
+        if 'O' in ph.type
             @warn """
             Order/disorder transition is not supported currently.
             Phase "$(ph.name)" is not included in the system.
             """
             continue
         end
-        push!(phas, ph)
+        push!(phass, ph)
     end
 
-    for el in db.elem
+    for el in db.elems
         el.name in ["/-", "VA"] && continue
-        push!(elem, el)
+        push!(elems, el)
     end
 
-    return init_system(db, elem, phas, eps = eps)
+    return init_system(db, elems, phass, eps = eps)
 end
 
 function equiatom(sys::System)

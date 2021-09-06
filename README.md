@@ -7,6 +7,8 @@
 
 ## Example
 
+Let's take Cu-Zn system assesed by [Liang et al. (2015)](https://www.sciencedirect.com/science/article/abs/pii/S0364591615300250) as an example.
+
 Read a tdb file:
 
 ```julia
@@ -63,7 +65,7 @@ Database:
                         ...
 ```
 
-Initialize a system (automatically removing electron gas, "/-", and vacancy, "VA")
+Initialize a system. The init_system function automatically choose all the element in the database except for electron gas (/-) and vacancy (VA) as components of the system:
 
 ```julia
 sys = init_system(db)
@@ -103,11 +105,15 @@ Eps: 0.24864 mol
 ## TODO
 
 ### Upcoming
-- Built-in calculation of equilibrium solidification (temperature dependency of phase constitution)
+- Built-in function to calculate equilibrium solidification (temperature dependency of phase constitution)
 
 ### Near-future
+- Support disorder/order transition
+- Stabilize calculation
+- Database operations (edit, merge, export, etc.)
 - Tests
 - Documentation
 
 ### Faraway-future
 - Phase diagram calculation
+- GUI
