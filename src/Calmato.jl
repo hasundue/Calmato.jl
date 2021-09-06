@@ -3,6 +3,7 @@ module Calmato
 using Printf
 
 using JuMP
+using RecipesBase
 import EAGO
 import McCormick
 import ForwardDiff
@@ -13,6 +14,7 @@ import MathOptInterface as MOI
 export read_tdb
 export init_system
 export equilib
+export solidify
 
 const R = 8.3144598 # gas constant
 const P = 1.0 # pressure
@@ -24,5 +26,6 @@ end
 include("database.jl")
 include("system.jl")
 include("equilib.jl")
+include("solidify.jl")
 
 end

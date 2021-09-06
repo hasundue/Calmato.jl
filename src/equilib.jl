@@ -1,5 +1,6 @@
 struct EquilibResult
     sys::System
+    T::Real # temperature
     X::Vector{Float64} # molar fractions of components
     Y::Vector{Float64} # molar amount of phases
     x::Array{Float64,2} # molar fractions of components in each phase
@@ -19,12 +20,14 @@ function Base.display(res::EquilibResult)
             phas.cons[s] == [] && continue
             println("\tsublattice $s")
             for j in 1:I
-                consname = res.sys.elem[j].name
+                consname = res.sys.elems[j].name
                 @printf "\t\t%s: %.4f\n" consname res.y[k,s,j]
             end
         end
     end
 end
+
+Base.print(res::EquilibResult) = Base.display(res)
 
 function equilib(sys::System, X = equiatom(sys), T = 298.15)
     # JuMP model
@@ -36,6 +39,10 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15)
     S = sys.nlatt # maximum number of sites in a sublattice
     n = sys.nsite # number of sites in each sublattice
 
+    if length(X) ≠ I
+        error("Invalid length of molar amount vector of components")
+    end
+
     # Variables
     _T = model[:_T] # temperature
     _X = model[:_X] # molar amount of components
@@ -45,6 +52,10 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15)
 
     # Fix temperature, T
     # TODO: Using fix() results in calling f(T) at T = 0 for some reason
+    Tl, Tu = sys.temp
+    if T < Tl || T > Tu
+        error("Temperature out of range")
+    end
     set_lower_bound(_T, T)
     set_upper_bound(_T, T)
 
@@ -64,7 +75,7 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15)
 
     optimize!(model)
 
-    return EquilibResult(sys, X, [ value(Y[k]) for k in 1:K ],
-                                 [ value(x[k,i]) for k in 1:K, i in 1:I ],
-                                 [ value(y[k,s,j]) for k in 1:K, s in 1:S, j in 1:J ])
+    return EquilibResult(sys, T, X, [ value(Y[k]) for k in 1:K ],
+                                    [ value(x[k,i]) for k in 1:K, i in 1:I ],
+                                    [ value(y[k,s,j]) for k in 1:K, s in 1:S, j in 1:J ])
 end

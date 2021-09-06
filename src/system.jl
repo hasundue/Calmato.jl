@@ -1,11 +1,12 @@
 struct System
-    elem::Vector{Element}
-    phas::Vector{Phase}
+    elems::Vector{Element}
+    phass::Vector{Phase}
     nelem::Int # number of elements
     ncons::Int # number of constituents
     nphas::Int # number of phases
     nlatt::Int # maximum number of sublattices in a phase
     nsite::Matrix{Int} # number of sites in each sublattice
+    temp::Tuple{Real,Real} # temprature range where all the functions are valid
     model::Model # JuMP model
 end
 
@@ -13,15 +14,20 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     # We do this because we modify Phase structs destructively
     phass = deepcopy(phass)
 
-    # Evaluate parsed CALPHAD functions and define them as Julia functions
+    # Evaluate parsed CALPHAD functions and define them as Julia functions and
+    # determine minimum and maximum temperature simultaneously.
     for func in db.funcs
         eval(Meta.parse(func.funcstr))
     end
+    Tl, Tu = -Inf, Inf
     for phas in phass
         for param in phas.params
             eval(Meta.parse(param.funcstr))
+            Tl = param.temp[1] > Tl ? param.temp[1] : Tl
+            Tu = param.temp[2] < Tu ? param.temp[2] : Tu
         end
     end
+    temp = (Tl,Tu)
 
     # TODO: Consitituents are identical to components in the current version of Calmato.
     conss = elems
@@ -119,7 +125,7 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     # x[k,i]: molar fraction of component i in phase f
     # y[k,s,j]: site fraction of a constituent j in sublattice s of phase f
     #
-    @variable(model, _T)
+    @variable(model, Tl <= _T <= Tu)
     @variable(model, _X[i=1:I] >= 0)
 
     @variable(model, Y[k=1:K] >= eps)
@@ -212,7 +218,7 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
 
     @debug model
 
-    return System(elems, phass, I, J, K, S, n, model)
+    return System(elems, phass, I, J, K, S, n, temp, model)
 end
 
 function init_system(db::Database; eps = 2e-8)
@@ -239,14 +245,17 @@ function init_system(db::Database; eps = 2e-8)
 end
 
 function equiatom(sys::System)
-    N = length(sys.elem)
+    N = length(sys.elems)
     return fill(1//N, N)
 end
 
 function Base.display(sys::System)
     println("System:")
-    nelem = length(sys.elem)
+    nelem = length(sys.elems)
     println("\tElements: $nelem")
-    nphas = length(sys.phas)
+    nphas = length(sys.phass)
     println("\tPhases: $nphas")
 end
+
+# TODO: Detailed output
+Base.print(sys::System) = Base.display(sys)

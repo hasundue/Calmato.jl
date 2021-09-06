@@ -102,14 +102,35 @@ Eps: 0.24864 mol
                 Zn: 0.7731
 ```
 
+Calculation of equlibirum solidification, or the temperature dependence of phase constitution:
+
+```julia
+res = solidify(sys, X)
+```
+
+```terminal
+Solidification:
+        298.15 ≤ T ≤ 1698.15
+        14 calculations
+```
+
+Calmato currently support Plots for visualization of results:
+
+```julia
+using Plots
+
+plot(res)
+```
+
+![solidification](docs/src/solidify.png)
+
 ## TODO
 
 ### Upcoming
-- Built-in function to calculate equilibrium solidification (temperature dependency of phase constitution)
+- Order/disorder transition
 
 ### Near-future
-- Disorder/order transition
-- More stable calculation
+- Improvement on calculation stability
 - Database operations (edit, merge, export, etc.)
 - Retrieve tdb files from [TDB DB](https://avdwgroup.engin.brown.edu/)
 - Tests
