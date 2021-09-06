@@ -6,16 +6,18 @@ struct Element
     S298::Float64
 end
 
-struct GFunction
+struct GFunction{T<:Real}
     name::AbstractString
+    temp::Tuple{T,T}
     funcstr::AbstractString
 end
 
-struct Parameter
+struct Parameter{S<:AbstractString, T<:Real}
     name::AbstractString
     symbol::Char
-    comb::Vector{Vector{AbstractString}}
+    comb::Vector{Vector{S}}
     order::Int
+    temp::Tuple{T,T}
     funcstr::AbstractString
 end
 
@@ -104,8 +106,8 @@ function parse_gfunction(text::AbstractString, funcs::Vector{GFunction})
     strs = split(text)
     @assert strs[1] == "Function"
     name = strs[2]
-    funcstr = parse_function(name, strs[3:end], funcs)
-    return GFunction(name, funcstr)
+    temp, funcstr = parse_function(name, strs[3:end], funcs)
+    return GFunction(name, temp, funcstr)
 end
 
 function parse_function(name::AbstractString, strs::Vector{SubString{String}}, funcs::Vector{GFunction})
@@ -153,7 +155,13 @@ function parse_function(name::AbstractString, strs::Vector{SubString{String}}, f
     str *= "\telseif T ≤ $(Ts[1])\n\t\t$(funcstrs[1])\n"
     str *= "\telseif T ≥ $(Ts[end])\n\t\t$(funcstrs[end])\n"
     str *= "\tend\nend\n"
-    return str
+
+    Tl, Tu = tryparse.(Int, [Ts[1], Ts[end]])
+    if nothing in [Tl, Tu]
+        Tl, Tu = parse.(Float64, [Ts[1], Ts[end]])
+    end
+
+    return (Tl, Tu), str
 end
 
 function parse_phase(text::AbstractString)
@@ -202,8 +210,8 @@ function parse_parameter(text::AbstractString, funcs::Vector{GFunction})
     comb_text, order_text = split(text, ';')
     comb = map(text -> split(text, ','), split(comb_text, ':'))
     order = parse(Int, order_text)
-    funcstr = parse_function(funcname, strs[3:end], funcs)
-    return phas, Parameter(name, symbol, comb, order, funcstr)
+    temp, funcstr = parse_function(funcname, strs[3:end], funcs)
+    return phas, Parameter(name, symbol, comb, order, temp, funcstr)
 end
 
 function getfuncname(str::AbstractString)
