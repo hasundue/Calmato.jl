@@ -211,8 +211,8 @@ function getfuncname(str::AbstractString)
 end
 
 function print_func(db::Database)
-    for fn in db.func
-        println(fn.func)
+    for func in db.funcs
+        println(func.funcstr)
     end
 end
 
