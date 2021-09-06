@@ -7,7 +7,7 @@
 
 ## Example
 
-Let's take Cu-Zn system assesed by [Liang et al. (2015)](https://www.sciencedirect.com/science/article/abs/pii/S0364591615300250).
+Let's take Cu-Zn system assesed by [Liang et al. (2015)](https://www.sciencedirect.com/science/article/abs/pii/S0364591615300250) as an example.
 
 Read a tdb file:
 
@@ -105,7 +105,7 @@ Eps: 0.24864 mol
 ## TODO
 
 ### Upcoming
-- Built-in calculation of equilibrium solidification (temperature dependency of phase constitution)
+- Built-in function to calculate equilibrium solidification (temperature dependency of phase constitution)
 
 ### Near-future
 - Support disorder/order transition
