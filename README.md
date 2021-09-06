@@ -115,7 +115,7 @@ Solidification:
         61 calculations
 ```
 
-Calmato currently support Plots for visualization of results:
+Calmato currently supports [**Plots**](https://github.com/JuliaPlots/Plots.jl) for visualization of results:
 
 ```julia
 using Plots
