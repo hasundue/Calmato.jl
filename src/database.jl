@@ -218,33 +218,33 @@ end
 
 function Base.display(db::Database)
     println("Database Summary:")
-    nelem = length(db.elem)
+    nelem = length(db.elems)
     println("\tElements: $nelem")
-    nfunc = length(db.func)
+    nfunc = length(db.funcs)
     println("\tFunctions: $nfunc")
-    nphas = length(db.phas)
+    nphas = length(db.phass)
     println("\tPhases: $nphas")
 end
 
 function Base.print(db::Database)
     println("Database:")
 
-    nelem = length(db.elem)
+    nelem = length(db.elems)
     println("\tElements: $nelem")
-    for elem in db.elem
+    for elem in db.elems
         println("\t\t$(elem.name)")
     end
 
-    nfunc = length(db.func)
+    nfunc = length(db.funcs)
     println("\tFunctions: $nfunc")
-    for func in db.func
+    for func in db.funcs
         println("\t\t$(func.name)")
     end
 
-    nphas = length(db.phas)
+    nphas = length(db.phass)
     println("\tPhases: $nphas")
     for k in 1:nphas
-        phas = db.phas[k]
+        phas = db.phass[k]
         print("\t\t$k: $(phas.name); ")
         cons = phas.cons
         nlatt = length(cons)
@@ -257,18 +257,18 @@ function Base.print(db::Database)
                 end
             end
             print(')')
-            print(phas.equi[i])
+            print(phas.sites[i])
         end
         print('\n')
-        for para in phas.para
-            print("\t\t\t$(para.symbol)")
+        for param in phas.params
+            print("\t\t\t$(param.symbol)")
             print('(')
-            nlatt = length(para.comb)
+            nlatt = length(param.comb)
             for i in 1:nlatt
-            latt = para.comb[i]
-                for el in latt
-                    print(el)
-                    if el ≠ latt[end]
+            latt = param.comb[i]
+                for cons in latt
+                    print(cons)
+                    if cons ≠ latt[end]
                         print(',')
                     end
                 end
@@ -276,7 +276,7 @@ function Base.print(db::Database)
                     print(':')
                 end
             end
-            print(";$(para.order)")
+            print(";$(param.order)")
             print(")\n")
         end
     end
