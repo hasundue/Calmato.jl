@@ -45,6 +45,32 @@ mutable struct Phase{T<:Real}
     end
 end
 
+function constitutionstring(phas::Phase, s::Int)
+    cons = phas.cons
+    str = '('
+    for elname in cons[s]
+        str *= elname
+        if elname ≠ cons[s][end]
+            str *= ','
+        end
+    end
+    str *= ')'
+    n = phas.sites[s]
+    if n ≠ one(n)
+        str *= string(n)
+    end
+    return str
+end
+
+function constitutionstring(phas::Phase)
+    S = length(phas.cons)
+    str = ""
+    for s in 1:S
+        str *= constitutionstring(phas, s)
+    end
+    return str
+end
+
 struct Database
     elems::Vector{Element}
     funcs::Vector{GFunction}
@@ -254,19 +280,7 @@ function Base.print(db::Database)
     for k in 1:nphas
         phas = db.phass[k]
         print("\t\t$k: $(phas.name); ")
-        cons = phas.cons
-        nlatt = length(cons)
-        for i in 1:nlatt
-            print('(')
-            for elem in cons[i]
-                print(elem)
-                if elem ≠ cons[i][end]
-                    print(',')
-                end
-            end
-            print(')')
-            print(phas.sites[i])
-        end
+        print(constitutionstring(phas))
         print('\n')
         for param in phas.params
             print("\t\t\t$(param.symbol)")
