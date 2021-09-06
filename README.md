@@ -108,9 +108,10 @@ Eps: 0.24864 mol
 - Built-in function to calculate equilibrium solidification (temperature dependency of phase constitution)
 
 ### Near-future
-- Support disorder/order transition
-- Stabilize calculation
+- Disorder/order transition
+- More stable calculation
 - Database operations (edit, merge, export, etc.)
+- Retrieve tdb files from [TDB DB](https://avdwgroup.engin.brown.edu/)
 - Tests
 - Documentation
 
