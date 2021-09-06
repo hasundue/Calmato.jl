@@ -7,11 +7,11 @@ struct EquilibResult
 end
 
 function Base.display(res::EquilibResult)
-    I = length(res.sys.elem)
-    K = length(res.sys.phas)
+    I = length(res.sys.elems)
+    K = length(res.sys.phass)
     @assert size(res.x) == (K,I)
     for k in 1:K
-        phas = res.sys.phas[k]
+        phas = res.sys.phass[k]
         res.Y[k] < 1e-5 && continue
         @printf "%s: %.5f mol\n" phas.name res.Y[k]
         S = length(phas.cons)
