@@ -17,7 +17,7 @@ RecipesBase = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
 [compat]
 EAGO = "0.6"
 ForwardDiff = "0.10"
-GLPK = "0.13"
+GLPK = "0.13, 0.14"
 Ipopt = "0.6"
 JuMP = "0.21"
 MathOptInterface = "0.9"
