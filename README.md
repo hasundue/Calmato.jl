@@ -9,15 +9,16 @@
 
 Let's take the Cu-Zn system assesed by [Liang et al. (2015)](https://www.sciencedirect.com/science/article/abs/pii/S0364591615300250) as an example.
 
-Read the tdb file, which can be downloaded from [TDB DB](https://avdwgroup.engin.brown.edu/):
+Search and read the tdb file from [TDB DB](https://avdwgroup.engin.brown.edu/):
 
 ```julia
 using Calmato
 
-db = read_tdb("cuzn_liang.tdb")
+db = search_db("Cu Zn Liang Hsiao 2015")
 ```
 
 ```terminal
+[1] Liang, Hsiao and Schmid-Fetzer (2015) Cu,Zn 
 Database Summary:
         Elements: 4
         Functions: 10

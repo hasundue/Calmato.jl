@@ -79,45 +79,47 @@ struct Database
     phass::Vector{Phase}
 end
 
-function read_tdb(tdb::AbstractString)
+function read_tdb(io::IO)
     elems = Vector{Element}()
     funcs = Vector{GFunction}()
     phass = Vector{Phase}()
 
-    open(tdb, "r") do io
-        while !eof(io)
-            block = readuntil(io, '!')
-
-            for keyword in [" ELEMENT ", "Function", "Phase", "Constituent", "Parameter"]
-                range = findfirst(keyword, block)
-                if range ≠ nothing
-                    text = block[first(range):end]
-                    if keyword == " ELEMENT "
-                        elem = parse_element(text)
-                        push!(elems, elem)
-                    elseif keyword == "Function"
-                        func = parse_gfunction(text, funcs)
-                        push!(funcs, func)
-                    elseif keyword == "Phase"
-                        phas = parse_phase(text)
-                        push!(phass, phas)
-                    elseif keyword == "Constituent"
-                        phasname, cons = parse_constituent(text)
-                        phas = filter(phas -> phas.name == phasname, phass)
-                        @assert length(phas) == 1
-                        phas[1].cons = cons
-                    elseif keyword == "Parameter"
-                        phasname, param = parse_parameter(text, funcs)
-                        phas = filter(phas -> phas.name == phasname, phass)
-                        @assert length(phas) == 1
-                        push!(phas[1].params, param)
-                    end
+    while !eof(io)
+        block = readuntil(io, '!')
+        for keyword in [" ELEMENT ", "Function", "Phase", "Constituent", "Parameter"]
+            range = findfirst(keyword, block)
+            if range ≠ nothing
+                text = block[first(range):end]
+                if keyword == " ELEMENT "
+                    elem = parse_element(text)
+                    push!(elems, elem)
+                elseif keyword == "Function"
+                    func = parse_gfunction(text, funcs)
+                    push!(funcs, func)
+                elseif keyword == "Phase"
+                    phas = parse_phase(text)
+                    push!(phass, phas)
+                elseif keyword == "Constituent"
+                    phasname, cons = parse_constituent(text)
+                    phas = filter(phas -> phas.name == phasname, phass)
+                    @assert length(phas) == 1
+                    phas[1].cons = cons
+                elseif keyword == "Parameter"
+                    phasname, param = parse_parameter(text, funcs)
+                    phas = filter(phas -> phas.name == phasname, phass)
+                    @assert length(phas) == 1
+                    push!(phas[1].params, param)
                 end
             end
         end
     end
-
     return Database(elems, funcs, phass)
+end
+
+function read_tdb(tdb::AbstractString)
+    open(tdb, "r") do io
+        read_tdb(io)
+    end
 end
 
 function parse_element(text::AbstractString)

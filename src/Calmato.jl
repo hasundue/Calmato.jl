@@ -10,8 +10,12 @@ import ForwardDiff
 import Ipopt
 import GLPK
 import MathOptInterface as MOI
+import HTTP
+import JSON
+import PeriodicTable
+import ZipFile
 
-export read_tdb
+export read_tdb, search_db
 export init_system
 export equilib
 export solidify
@@ -24,6 +28,7 @@ function McCormick.xlogx(d::T) where T <: ForwardDiff.Dual
 end
 
 include("database.jl")
+include("tdbdb.jl")
 include("system.jl")
 include("equilib.jl")
 include("solidify.jl")
