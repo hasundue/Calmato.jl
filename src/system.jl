@@ -5,7 +5,7 @@ struct System
     ncons::Int # number of constituents
     nphas::Int # number of phases
     nlatt::Int # maximum number of sublattices in a phase
-    nsite::Matrix{Int} # number of sites in each sublattice
+    nsite::Matrix{Real} # number of sites in each sublattice
     temp::Tuple{Real,Real} # temprature range where all the functions are valid
     model::Model # JuMP model
 end
@@ -131,7 +131,7 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     @variable(model, Y[k=1:K] >= eps)
 
     x_max = [ sum( n[k,s] for s in 1:S if i in constitution[k][s] ) / sum( n[k,s] for s in 1:S ) for k in 1:K, i in 1:I ]
-    @variable(model, 0 <= x[k=1:K,i=1:I] <= x_max[k,i])
+    @variable(model, eps <= x[k=1:K,i=1:I] <= x_max[k,i])
 
     @variable(model, eps <= y[k=1:K,s=1:S,j=1:J] <= 1)
 
@@ -165,13 +165,21 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
                                         / sum( n[k,s] for s in 1:S if constitution[k][s] ≠ [] ))
     end
 
-    # Gibbs energy contribution from each parameter
-    Gs_phase = JuMP.NonlinearExpression[]
-    for k in 1:K
-        Gs_param = JuMP.NonlinearExpression[]
+    # Register all the functions for parameters
+    for phas in phass
+        for param in phas.params
+            funcname = getfuncname(param.name)
+            funcsym = Symbol(funcname)
+            func = getfield(Calmato, funcsym)
+            register(model, funcsym, 1, func, autodiff = true)
+        end
+    end
 
+    function G_phas(k::Int; disordered = false)
+        phas = phass[k]
+        Gs_param = JuMP.NonlinearExpression[]
         m = 0
-        for param in phass[k].params
+        for param in phas.params
             m += 1
             l = param.order
 
@@ -181,8 +189,6 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
             # Value of the parameter
             funcname = getfuncname(param.name)
             funcsym = Symbol(funcname)
-            func = getfield(Calmato, funcsym)
-            register(model, funcsym, 1, func, autodiff = true)
             @eval push!($Gs_param, @NLexpression($model, ($funcsym)($_T)))
 
             # Solo constituents
@@ -190,7 +196,7 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
             solo = [ (s, comb[s][1]) for s in s_solo ]
             for (s,j) in solo
                 if length(constitution[k][s]) > 1
-                    Gs_param[m] = @NLexpression(model, Gs_param[m] * y[k,s,j])
+                    Gs_param[m] = @NLexpression(model, Gs_param[m] * ( disordered ? x[k,j] : y[k,s,j] ))
                 end
             end
 
@@ -201,24 +207,59 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
                 s = s_duo[1]
                 i = comb[s][1]
                 j = comb[s][2]
-                Gs_param[m] = @NLexpression(model, Gs_param[m] * y[k,s,i] * y[k,s,j])
+                Gs_param[m] = @NLexpression(model,
+                                Gs_param[m] * ( disordered ? x[k,i] * x[k,j] : y[k,s,i] * y[k,s,j] ))
                 for ν in 1:l 
-                    Gs_param[m] = @NLexpression(model, Gs_param[m] * (y[k,s,i] - y[k,s,j]))
+                    Gs_param[m] = @NLexpression(model,
+                            Gs_param[m] * ( disordered ? x[k,i] - x[k,j] : y[k,s,i] - y[k,s,j] ))
                 end
             end
         end
 
-        push!(Gs_phase, @NLexpression(model, sum(Gs_param[i] for i in 1:m)))
-
-        Gs_phase[k] = @NLexpression(model, Gs_phase[k] + R*_T*sum( n[k,s] * xlogx(y[k,s,j])
+        return @NLexpression(model, sum(Gs_param[i] for i in 1:m)
+            + R*_T*sum( n[k,s] * xlogx( disordered ? x[k,j] : y[k,s,j] )
             for s in 1:S, j in 1:J if j in constitution[k][s] && length(constitution[k][s]) > 1 ))
     end
 
-    @NLobjective(model, Min, sum(Y[k]*Gs_phase[k] for k in 1:K))
+    # Gibbs energy contribution from each phase
+    Gs_phas = JuMP.NonlinearExpression[]
+    for k in 1:K
+        phas = phass[k]
+
+        k_do = disorder_id(db, phas)
+        if k_do ≠ nothing # ordered phase
+            push!(Gs_phas, G_phas(k_do)) # disordered part
+            @eval $Gs_phas[$k] = @NLexpression($model, $Gs_phas[$k] + $(G_phas(k)))
+            @eval $Gs_phas[$k] = @NLexpression($model, $Gs_phas[$k] - $(G_phas(k, disordered = true)))
+        else
+            @eval push!($Gs_phas, $(G_phas(k)))
+        end
+    end
+
+    @NLobjective(model, Min, sum(Y[k]*Gs_phas[k] for k in 1:K))
 
     @debug model
 
     return System(elems, phass, I, J, K, S, n, temp, model)
+end
+
+function disorder_id(db::Database, phas::Phase)
+    code = phas.type
+    for char in code
+        i = findfirst(type -> type.code == char, db.types)
+        @assert i ≠ nothing
+        tdef = db.types[i]
+        args = split(tdef.args)
+        length(args) < 3 && continue
+        if args[2] == phas.name && args[3] == "DISORDER_PART"
+            @assert args[1] == "AMEND_PHASE_DESCRIPTION"
+            phasname = args[4]
+            j = findfirst(phas -> phas.name == phasname, db.phass)
+            @assert j ≠ nothing
+            return j
+        end
+    end
+    return nothing
 end
 
 function init_system(db::Database; eps = 2e-8)
