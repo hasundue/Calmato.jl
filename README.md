@@ -134,7 +134,6 @@ plot(res)
 ### Near-future
 - Improvement on calculation stability
 - Database operations (edit, merge, export, etc.)
-- Retrieve tdb files from [TDB DB](https://avdwgroup.engin.brown.edu/)
 - Tests
 - Documentation
 
