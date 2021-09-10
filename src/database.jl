@@ -73,20 +73,28 @@ function constitutionstring(phas::Phase)
     return str
 end
 
+struct TypeDefinition
+    code::Char
+    key::AbstractString # SEQ, GES, etc.
+    args::AbstractString
+end
+
 struct Database
     elems::Vector{Element}
     funcs::Vector{GFunction}
     phass::Vector{Phase}
+    types::Vector{TypeDefinition}
 end
 
 function read_tdb(io::IO)
     elems = Vector{Element}()
     funcs = Vector{GFunction}()
     phass = Vector{Phase}()
+    types = Vector{TypeDefinition}()
 
     while !eof(io)
         block = readuntil(io, '!')
-        for keyword in [" ELEMENT ", "Function", "Phase", "Constituent", "Parameter"]
+        for keyword in [" ELEMENT ", "Function", "Type_Definition", "Phase", "Constituent", "Parameter"]
             range = findfirst(keyword, block)
             if range ≠ nothing
                 text = block[first(range):end]
@@ -96,6 +104,9 @@ function read_tdb(io::IO)
                 elseif keyword == "Function"
                     func = parse_gfunction(text, funcs)
                     push!(funcs, func)
+                elseif keyword == "Type_Definition"
+                    type = parse_typedefinition(text)
+                    push!(types, type)
                 elseif keyword == "Phase"
                     phas = parse_phase(text)
                     push!(phass, phas)
@@ -113,7 +124,7 @@ function read_tdb(io::IO)
             end
         end
     end
-    return Database(elems, funcs, phass)
+    return Database(elems, funcs, phass, types)
 end
 
 function read_tdb(tdb::AbstractString)
@@ -192,6 +203,20 @@ function parse_function(name::AbstractString, strs::Vector{SubString{String}}, f
     end
 
     return (Tl, Tu), str
+end
+
+function parse_typedefinition(text::AbstractString)
+    strs = split(text)
+    @assert strs[1] == "Type_Definition"
+    code = strs[2]
+    @assert length(code) == 1
+    code = code[1]
+    key = strs[3]
+    if !(key in ["SEQ", "GES"])
+        @warn "Unsupported keyword, $key, for TYPE_DEFINITION"
+    end
+    args = join(strs[4:end], ' ')
+    return TypeDefinition(code, key, args)
 end
 
 function parse_phase(text::AbstractString)
