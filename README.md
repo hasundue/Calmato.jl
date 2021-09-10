@@ -129,7 +129,7 @@ plot(res)
 ## TODO
 
 ### Upcoming
-- Order/disorder transition
+- Magnetic contribution
 
 ### Near-future
 - Improvement on calculation stability
