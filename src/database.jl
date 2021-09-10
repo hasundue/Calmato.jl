@@ -181,7 +181,7 @@ function parse_function(name::AbstractString, strs::Vector{SubString{String}}, f
     N = length(funcstrs)
     str = "function $(name)(T)::typeof(T)\n"
     for i in 1:N
-        for pair in ["T*LN(T)" => "McCormick.xlogx(T)", "LN(" => "log(", "**" => "^", ".+" => ".0+", ".-" => ".0-", ".*" => ".0*", "./" => ".0/"]
+        for pair in ["T*LN(T)" => "xlogx(T)", "LN(" => "log(", "**" => "^", ".+" => ".0+", ".-" => ".0-", ".*" => ".0*", "./" => ".0/"]
             funcstrs[i] = replace(funcstrs[i], pair)
         end
         funcstrs[i] = strip(funcstrs[i], ';')

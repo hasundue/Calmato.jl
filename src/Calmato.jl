@@ -5,7 +5,7 @@ using Printf
 using JuMP
 using RecipesBase
 import EAGO
-import McCormick
+import McCormick; xlogx
 import ForwardDiff
 import Ipopt
 import GLPK
