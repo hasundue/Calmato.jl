@@ -9,6 +9,7 @@ import McCormick
 import ForwardDiff
 import Ipopt
 import GLPK
+import Tulip
 import MathOptInterface as MOI
 import HTTP
 import JSON
