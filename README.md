@@ -88,19 +88,20 @@ equilib(sys, X, T)
 ```
 
 ```terminal
-Gamma: 0.02890 mol
-        Sublattice (Cu)4
+Gamma: 0.0289 mol
+        Cu: 0.3242
+        Zn: 0.6758
+        (Cu)4
                 Cu: 1.0000
-                Zn: 0.0000
-        Sublattice (Cu,Zn)6
+        (Cu,Zn)6
                 Cu: 0.7363
                 Zn: 0.2637
-        Sublattice (Cu,Zn)16
+        (Cu,Zn)16
                 Cu: 0.0007
                 Zn: 0.9993
-Eps: 0.24864 mol
-                Cu: 0.2269
-                Zn: 0.7731
+Eps: 0.2486 mol
+        Cu: 0.2269
+        Zn: 0.7731
 ```
 
 Calculation of equlibirum solidification, or the temperature dependence of phase constitution:

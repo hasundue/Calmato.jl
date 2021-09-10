@@ -14,16 +14,23 @@ function Base.display(res::EquilibResult)
     for k in 1:K
         phas = res.sys.phass[k]
         res.Y[k] < 1e-5 && continue
-        @printf "%s: %.5f mol\n" phas.name res.Y[k]
-        S = length(phas.cons)
+        @printf "%s: %.4f mol\n" phas.name res.Y[k]
+        for i in 1:I
+            @printf "\t%s: %.4f\n" res.sys.elems[i].name res.x[k,i]
+        end
+        cons = filter(latt -> !isempty(latt), phas.cons)
+        S = length(cons)
+        S < 2 && continue
         for s in 1:S
             phas.cons[s] == [] && continue
             if length(filter(l -> l ≠ [], phas.cons)) > 1
-                println("\tSublattice " * constitutionstring(phas, s))
+                println("\t" * constitutionstring(phas, s))
             end
             for j in 1:I
                 consname = res.sys.elems[j].name
-                @printf "\t\t%s: %.4f\n" consname res.y[k,s,j]
+                if consname in cons[s]
+                    @printf "\t\t%s: %.4f\n" consname res.y[k,s,j]
+                end
             end
         end
     end
