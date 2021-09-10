@@ -223,9 +223,12 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
             end
         end
 
-        return @NLexpression(model, sum(Gs_param[i] for i in 1:m)
-            + R*_T*sum( n[k,s] * xlogx( disordered ? x[k,j] : y[k,s,j] )
-            for s in 1:S, j in 1:J if j in constitution[k][s] && length(constitution[k][s]) > 1 ))
+        if disordered
+            return @NLexpression(model, sum(Gs_param[i] for i in 1:m))
+        else
+            return @NLexpression(model, sum(Gs_param[i] for i in 1:m) + R*_T*sum( n[k,s] * xlogx( y[k,s,j] )
+                for s in 1:S, j in 1:J if j in constitution[k][s] && length(constitution[k][s]) > 1 ))
+        end
     end
 
     # Gibbs energy contribution from each phase
