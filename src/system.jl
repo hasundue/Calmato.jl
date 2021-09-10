@@ -65,10 +65,11 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     #
     glpk = GLPK.Optimizer()
     MOI.set(glpk, MOI.RawParameter("meth"), 2)
+    MOI.set(glpk, MOI.RawParameter("msg_lev"), 0)
 
     @debug begin
         MOI.set(glpk, MOI.RawParameter("msg_lev"), 4) # GLP_MSG_ALL
-        MOI.set(glpk, MOI.RawParameter("out_frq"), 1) # GLP_MSG_ALL
+        MOI.set(glpk, MOI.RawParameter("out_frq"), 1)
         "Enabled GLPK debugging"
     end
 
