@@ -175,11 +175,10 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
         end
     end
 
-    function G_phas(k::Int; disordered = false)
-        phas = phass[k]
+    function G_phas(k::Int; k_param::Int = k, disordered::Bool = false)
         Gs_param = JuMP.NonlinearExpression[]
         m = 0
-        for param in phas.params
+        for param in phass[k_param].params
             m += 1
             l = param.order
 
@@ -207,11 +206,11 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
                 s = s_duo[1]
                 i = comb[s][1]
                 j = comb[s][2]
-                Gs_param[m] = @NLexpression(model,
-                                Gs_param[m] * ( disordered ? x[k,i] * x[k,j] : y[k,s,i] * y[k,s,j] ))
+                Gs_param[m] = disordered ? @NLexpression(model, Gs_param[m] * x[k,i] * x[k,j]) :
+                                           @NLexpression(model, Gs_param[m] * y[k,s,i] * y[k,s,j])
                 for ν in 1:l 
-                    Gs_param[m] = @NLexpression(model,
-                            Gs_param[m] * ( disordered ? x[k,i] - x[k,j] : y[k,s,i] - y[k,s,j] ))
+                    Gs_param[m] = disordered ? @NLexpression(model, Gs_param[m] * ( x[k,i] - x[k,j] )) :
+                                               @NLexpression(model, Gs_param[m] * ( y[k,s,i] - y[k,s,j] ))
                 end
             end
         end
@@ -228,7 +227,7 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
 
         k_do = disorder_id(db, phas)
         if k_do ≠ nothing # ordered phase
-            push!(Gs_phas, G_phas(k_do)) # disordered part
+            push!(Gs_phas, G_phas(k, k_param = k_do, disordered = true)) # disordered part
             @eval $Gs_phas[$k] = @NLexpression($model, $Gs_phas[$k] + $(G_phas(k)))
             @eval $Gs_phas[$k] = @NLexpression($model, $Gs_phas[$k] - $(G_phas(k, disordered = true)))
         else
