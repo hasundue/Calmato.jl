@@ -3,9 +3,9 @@ module Calmato
 using Printf
 
 using JuMP
+using McCormick; xlogx
 using RecipesBase
 import EAGO
-import McCormick; xlogx
 import ForwardDiff
 import Ipopt
 import GLPK
