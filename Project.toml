@@ -26,6 +26,7 @@ Ipopt = "0.6"
 JuMP = "0.21"
 MathOptInterface = "0.9"
 McCormick = "0.10"
+PeriodicTable = "1"
 RecipesBase = "1"
 julia = "1.6"
 
