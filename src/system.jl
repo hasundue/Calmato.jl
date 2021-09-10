@@ -239,7 +239,8 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
         k_do = disorder_id(db, phas)
         if k_do ≠ nothing # ordered phase
             push!(Gs_phas, G_phas(k, k_param = k_do, disordered = true)) # disordered part
-            @eval $Gs_phas[$k] = @NLexpression($model, $Gs_phas[$k] + $(G_phas(k)))
+            # TODO: +0.05 is an adhock parameter of "penalty" on the ordered phase.
+            @eval $Gs_phas[$k] = @NLexpression($model, $Gs_phas[$k] + $(G_phas(k)) + 0.05)
             @eval $Gs_phas[$k] = @NLexpression($model, $Gs_phas[$k] - $(G_phas(k, disordered = true)))
         else
             @eval push!($Gs_phas, $(G_phas(k)))
