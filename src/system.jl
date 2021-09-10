@@ -75,14 +75,6 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
         "Enabled GLPK debugging"
     end
 
-    tulip = Tulip.Optimizer()
-    MOI.set(tulip, MOI.RawParameter("OutputLevel"), 0)
-
-    @debug begin
-        MOI.set(tulip, MOI.RawParameter("OutputLevel"), 1)
-        "Enabled Tulip debugging"
-    end
-
     #
     # Ipopt as the upper solver in EAGO
     #
@@ -103,7 +95,7 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     # EAGO Optimizer
     #
     model = Model(optimizer_with_attributes(EAGO.Optimizer,
-        "relaxed_optimizer" => tulip,
+        "relaxed_optimizer" => glpk,
         "upper_optimizer" => ipopt,
         "verbosity" => 0,
         "output_iterations" => 1,
