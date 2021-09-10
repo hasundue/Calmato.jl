@@ -129,14 +129,14 @@ plot(res)
 ## TODO
 
 ### Upcoming
-- Magnetic contribution
+- Database operations (edit, merge, export, etc.)
 
 ### Near-future
-- Improvement on calculation stability
-- Database operations (edit, merge, export, etc.)
 - Tests
 - Documentation
+- Release
 
 ### Faraway-future
+- Magnetic contribution
 - Phase diagram calculation
 - GUI
