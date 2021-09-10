@@ -266,13 +266,6 @@ function init_system(db::Database; eps = 2e-8)
     phass = Vector{Phase}()
 
     for ph in db.phass
-        if 'O' in ph.type
-            @warn """
-            Order/disorder transition is not supported currently.
-            Phase "$(ph.name)" is not included in the system.
-            """
-            continue
-        end
         push!(phass, ph)
     end
 
