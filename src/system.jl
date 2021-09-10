@@ -65,9 +65,6 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     #
     glpk = GLPK.Optimizer()
     MOI.set(glpk, MOI.RawParameter("meth"), 2)
-    MOI.set(glpk, MOI.RawParameter("tol_bnd"), 1e-3)
-    MOI.set(glpk, MOI.RawParameter("tol_dj"), 1e-3)
-    MOI.set(glpk, MOI.RawParameter("tol_piv"), 1e-5)
 
     @debug begin
         MOI.set(glpk, MOI.RawParameter("msg_lev"), 4) # GLP_MSG_ALL
@@ -80,10 +77,10 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     #
     ipopt = Ipopt.Optimizer()
 
-    MOI.set(ipopt, MOI.RawParameter("tol"), 1e-3)
-    MOI.set(ipopt, MOI.RawParameter("dual_inf_tol"), 1e+2)
+    MOI.set(ipopt, MOI.RawParameter("tol"), 1e-2)
+    MOI.set(ipopt, MOI.RawParameter("dual_inf_tol"), 1e-6)
     MOI.set(ipopt, MOI.RawParameter("constr_viol_tol"), eps)
-    MOI.set(ipopt, MOI.RawParameter("max_iter"), 100)
+    MOI.set(ipopt, MOI.RawParameter("max_iter"), 1000)
     MOI.set(ipopt, MOI.RawParameter("print_level"), 0)
 
     @debug begin
@@ -231,8 +228,8 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
         k_do = disorder_id(db, phas)
         if k_do ≠ nothing # ordered phase
             push!(Gs_phas, G_phas(k, k_param = k_do, disordered = true)) # disordered part
-            # TODO: +0.05 is an adhock parameter of "penalty" on the ordered phase.
-            @eval $Gs_phas[$k] = @NLexpression($model, $Gs_phas[$k] + $(G_phas(k)) + 0.05)
+            # TODO: + 1.0 is an adhock and unphysical parameter of "penalty" on the ordered phase.
+            @eval $Gs_phas[$k] = @NLexpression($model, $Gs_phas[$k] + $(G_phas(k)) + 1.0)
             @eval $Gs_phas[$k] = @NLexpression($model, $Gs_phas[$k] - $(G_phas(k, disordered = true)))
         else
             @eval push!($Gs_phas, $(G_phas(k)))
