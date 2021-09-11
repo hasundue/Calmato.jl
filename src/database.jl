@@ -216,8 +216,6 @@ function parse_function(name::AbstractString, strs::Vector{SubString{String}}, f
         end
         str *= "\t\t" * funcstrs[i] * "\n"
     end
-    str *= "\telseif T ≤ $(Ts[1])\n\t\t$(funcstrs[1])\n"
-    str *= "\telseif T ≥ $(Ts[end])\n\t\t$(funcstrs[end])\n"
     str *= "\tend\nend\n"
 
     Tl, Tu = tryparse.(Int, [Ts[1], Ts[end]])
