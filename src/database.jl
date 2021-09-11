@@ -185,7 +185,7 @@ function parse_element(text::AbstractString)
     strs = split(text)
     @assert length(strs) == 6
     @assert match(r"ELEMENT"i, strs[1]) ≠ ""
-    name = strs[2]
+    name = format_element(strs[2])
     refstate = strs[3]
     mass, H298, S298 = parse.(Float64, strs[4:6])
     return Element(name, refstate, mass, H298, S298)
@@ -279,6 +279,7 @@ function parse_constituent(text::AbstractString)
     @assert match(r"CONSTITUENT"i, strs[1]) ≠ ""
     phas = split(strs[2], ':')[1] # "Liquid", "Bcc", "Fcc", etc.
     cons_text = join(strs[3:end]) # ":Cu,Zn", ":Cu,Zn:Cu,Zn:", etc.
+    cons_text = format_constitution(cons_text)
     cons_strs = split(cons_text, ':')
     cons_strs = filter(e -> e ≠ "", cons_strs)
     cons = map(text -> split(text, ','), cons_strs)
@@ -295,12 +296,14 @@ function parse_parameter(text::AbstractString)
     k = findfirst('(', text)
     l = findfirst(')', text)
     name = replace(text[1:l], " " => "") # G(BCC_B2,Cu:Cu,Zn;0)
+    name = format_constitution(name)
     funcname = getfuncname(name) # GBCC_B2CuCuZn0
     symbol = name[1] # G
 
     strs = split(text[l+1:end]) # 298.15...
 
     text = text[k+1:l-1] # BCC_B2,Cu,Zn:Cu,Zn;0
+    text = format_constitution(text)
 
     k = findfirst(',', text)
     phas = replace(text[1:k-1], " " => "") # BCC_B2
@@ -314,6 +317,23 @@ function parse_parameter(text::AbstractString)
     temp, funcstr = parse_function(funcname, strs)
 
     return phas, Parameter(name, symbol, comb, order, temp, funcstr)
+end
+
+function format_constitution(str::AbstractString)
+    # ex. str = "G(FCC,Cu:Cu,Zn,P;0)"
+    replace(str, r"(?<=,|;|:).+?(?=,|;|:)" => format_specie)
+end
+
+function format_specie(str::AbstractString)
+    # ex. str = "Cu2S1", "CU2O"
+    replace(str, r"\D{1,2}(?=\d{1,}|$)" => format_element)
+end
+
+function format_element(str::AbstractString)
+    N = length(str)
+    N > 2 && error("Invalid element name: $str")
+    N == 2 && return uppercase(str[1]) * lowercase(str[2])
+    N == 1 && return uppercase(str)
 end
 
 function getfuncname(str::AbstractString)
