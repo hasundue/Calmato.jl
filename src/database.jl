@@ -6,13 +6,15 @@ struct Element
     S298::Float64
 end
 
-struct GFunction{T<:Real}
+abstract type AbstractGFunction end
+
+mutable struct GFunction{T<:Real} <: AbstractGFunction
     name::AbstractString
     temp::Tuple{T,T}
     funcstr::AbstractString
 end
 
-struct Parameter{S<:AbstractString, T<:Real}
+mutable struct Parameter{S<:AbstractString, T<:Real} <: AbstractGFunction
     name::AbstractString
     symbol::Char
     comb::Vector{Vector{S}}
@@ -86,6 +88,7 @@ end
 const keywordlist = [
     "ELEMENT",
     "FUNCTION",
+    "FUNCT",
     "TYPE_DEFINITION",
     "PHASE",
     "CONSTITUENT",
@@ -98,6 +101,7 @@ function read_tdb(io::IO)
     phass = Vector{Phase}()
     types = Vector{TypeDefinition}()
 
+    # Parse each elements
     while !eof(io)
         block = readline(io)
 
@@ -123,8 +127,8 @@ function read_tdb(io::IO)
             if keyword == "ELEMENT"
                 elem = parse_element(block)
                 push!(elems, elem)
-            elseif keyword == "FUNCTION"
-                func = parse_gfunction(block, funcs)
+            elseif keyword in ["FUNCTION", "FUNCT"]
+                func = parse_gfunction(block)
                 push!(funcs, func)
             elseif keyword == "TYPE_DEFINITION"
                 type = parse_typedefinition(block)
@@ -138,7 +142,7 @@ function read_tdb(io::IO)
                 @assert length(phas) == 1
                 phas[1].cons = cons
             elseif keyword == "PARAMETER"
-                phasname, param = parse_parameter(block, funcs)
+                phasname, param = parse_parameter(block)
                 phas = filter(phas -> uppercase(phas.name) == uppercase(phasname), phass)
                 @assert length(phas) == 1
                 push!(phas[1].params, param)
@@ -147,7 +151,28 @@ function read_tdb(io::IO)
             error("Invalid description in the tdb file: $block")
         end
     end
+
+    # "Julialize" the functions
+    for func in funcs
+        julialize_funcstr!(func, funcs)
+    end
+    for phas in phass
+        for param in phas.params
+            julialize_funcstr!(param, funcs)
+        end
+    end
+
     return Database(elems, funcs, phass, types)
+end
+
+function julialize_funcstr!(arg::AbstractGFunction, funcs::Vector{GFunction})
+    for pair in ["T*LN(T)" => "xlogx(T)", "LN(" => "log(", "**" => "^", ".+" => ".0+", ".-" => ".0-", ".*" => ".0*", "./" => ".0/"]
+        arg.funcstr = replace(arg.funcstr, pair)
+    end
+    for func in funcs
+        func.name == arg.name && continue
+        arg.funcstr = replace(arg.funcstr, func.name => "$(func.name)(T)")
+    end
 end
 
 function read_tdb(tdb::AbstractString)
@@ -166,15 +191,15 @@ function parse_element(text::AbstractString)
     return Element(name, refstate, mass, H298, S298)
 end
 
-function parse_gfunction(text::AbstractString, funcs::Vector{GFunction})
+function parse_gfunction(text::AbstractString)
     strs = split(text)
     @assert match(r"FUNCTION"i, strs[1]) ≠ ""
     name = strs[2]
-    temp, funcstr = parse_function(name, strs[3:end], funcs)
+    temp, funcstr = parse_function(name, strs[3:end])
     return GFunction(name, temp, funcstr)
 end
 
-function parse_function(name::AbstractString, strs::Vector{SubString{String}}, funcs::Vector{GFunction})
+function parse_function(name::AbstractString, strs::Vector{SubString{String}})
     Ts = Vector{AbstractString}()
     funcstrs = Vector{AbstractString}()
 
@@ -182,7 +207,7 @@ function parse_function(name::AbstractString, strs::Vector{SubString{String}}, f
     k = 2
 
     while true
-        push!(funcstrs, strs[k])
+        push!(funcstrs, replace(strs[k], "#" => ""))
         k += 1
         while isnothing(findfirst(';', funcstrs[end]))
             funcstrs[end] = funcstrs[end] * strs[k]
@@ -204,16 +229,10 @@ function parse_function(name::AbstractString, strs::Vector{SubString{String}}, f
     N = length(funcstrs)
     str = "function $(name)(T)::typeof(T)\n"
     for i in 1:N
-        for pair in ["T*LN(T)" => "xlogx(T)", "LN(" => "log(", "**" => "^", ".+" => ".0+", ".-" => ".0-", ".*" => ".0*", "./" => ".0/"]
-            funcstrs[i] = replace(funcstrs[i], pair)
-        end
         funcstrs[i] = strip(funcstrs[i], ';')
 
         str *= i == 1 ? "\tif " : "\telseif "
         str *= "$(Ts[i]) ≤ T ≤ $(Ts[i+1])\n"
-        for func in funcs
-            funcstrs[i] = replace(funcstrs[i], func.name => "$(func.name)(T)")
-        end
         str *= "\t\t" * funcstrs[i] * "\n"
     end
     str *= "\tend\nend\n"
@@ -266,7 +285,7 @@ function parse_constituent(text::AbstractString)
     return phas, cons
 end
 
-function parse_parameter(text::AbstractString, funcs::Vector{GFunction})
+function parse_parameter(text::AbstractString)
     # Parameters
     strs = split(text)
     @assert match(r"PARAMETER"i, strs[1]) ≠ ""
@@ -292,7 +311,7 @@ function parse_parameter(text::AbstractString, funcs::Vector{GFunction})
     comb = map(text -> split(text, ','), comb_strs) # [[Cu], [Cu,Zn]]
     order = parse(Int, order_text)
 
-    temp, funcstr = parse_function(funcname, strs, funcs)
+    temp, funcstr = parse_function(funcname, strs)
 
     return phas, Parameter(name, symbol, comb, order, temp, funcstr)
 end
