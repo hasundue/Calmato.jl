@@ -278,7 +278,7 @@ function parse_constituent(text::AbstractString)
     strs = split(text)
     @assert match(r"CONSTITUENT"i, strs[1]) ≠ ""
     phas = split(strs[2], ':')[1] # "Liquid", "Bcc", "Fcc", etc.
-    cons_text = strs[3] # ":Cu,Zn", ":Cu,Zn:Cu,Zn:", etc.
+    cons_text = join(strs[3:end]) # ":Cu,Zn", ":Cu,Zn:Cu,Zn:", etc.
     cons_strs = split(cons_text, ':')
     cons_strs = filter(e -> e ≠ "", cons_strs)
     cons = map(text -> split(text, ','), cons_strs)
