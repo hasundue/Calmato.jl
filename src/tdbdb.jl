@@ -18,6 +18,8 @@ function search_db(str::AbstractString)
     res = HTTP.get("http://avdwgroup.engin.brown.edu/getdbid.php?element=" * elems)
     dicts = JSON.parse(String(res.body))
 
+    isempty(dicts) && error("No database found")
+
     for kwrd in kwrds
         dicts = filter(dict -> occursin(kwrd, string(dict)), dicts)
     end
