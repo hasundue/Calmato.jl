@@ -148,7 +148,7 @@ function read_tdb(io::IO)
                 push!(phas[1].params, param)
             end
         catch
-            error("Invalid description in the tdb file: $block")
+            error("Unrecognized description in the tdb file:\n$block")
         end
     end
 
