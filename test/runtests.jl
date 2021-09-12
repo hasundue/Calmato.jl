@@ -8,4 +8,7 @@ using Test
     print(sys)
     res = solidify(sys)
     print(res)
+
+    db = search_db("Cu H O S P Magnusson")
+    select(db, "Cu S P")
 end
