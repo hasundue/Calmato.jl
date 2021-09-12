@@ -411,7 +411,7 @@ end
 
 function select(db::Database, elnames::Vector{<:AbstractString})
     elems = Element[]
-    funcs = Function[]
+    funcs = GFunction[]
     phass = Phase[]
     types = TypeDefinition[]
 
@@ -420,13 +420,33 @@ function select(db::Database, elnames::Vector{<:AbstractString})
             push!(elems, elem)
         end
     end
-
     for phas in db.phass
         phas_selected = select(phas, elnames)
         isnothing(phas_selected) && continue
         push!(phass, phas_selected)
     end
 
+    # Functions used in parameters
+    for func in db.funcs
+        if any(phas -> isused(func, phas), phass)
+            push!(funcs, func)
+        end
+    end
+
+    # Functions used in functions
+    function push_func!(func)
+        func in funcs && return false
+        if any(_func -> isused(func, _func), funcs)
+            push!(funcs, func)
+            return true
+        else
+            return false
+        end
+    end
+    found = true
+    while found
+        found = any(push_func!, db.funcs)
+    end
     return Database(elems, funcs, phass, types)
 end
 
@@ -463,7 +483,7 @@ end
 
 function iscomposedof(spec::AbstractString, elems::Vector{<:AbstractString})
     comps = composedof(spec)
-    return all(map(elem -> elem in elems, comps))
+    return all(elem -> elem in elems, comps)
 end
 
 function iscomposedof(cons::Constitution, elems::Vector{<:AbstractString})
@@ -473,4 +493,15 @@ function iscomposedof(cons::Constitution, elems::Vector{<:AbstractString})
         end
     end
     return true
+end
+
+function isused(func::GFunction, phas::Phase)
+    for param in phas.params
+        occursin(func.name, param.funcstr) && return true
+    end
+    return false
+end
+
+function isused(func1::GFunction, func2::GFunction)
+    return occursin(func1.name, func2.funcstr)
 end
