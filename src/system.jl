@@ -272,7 +272,7 @@ function init_system(db::Database; eps = 2e-8)
     end
 
     for el in db.elems
-        el.name in ["/-", "VA"] && continue
+        el.name in ["/-", "Va"] && continue
         push!(elems, el)
     end
 
