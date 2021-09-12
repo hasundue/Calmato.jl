@@ -15,7 +15,7 @@ import JSON
 import PeriodicTable
 import ZipFile
 
-export read_tdb, search_db
+export read_tdb, search_db, select
 export init_system
 export equilib
 export solidify

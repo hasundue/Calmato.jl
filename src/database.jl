@@ -14,28 +14,37 @@ mutable struct GFunction{T<:Real} <: AbstractGFunction
     funcstr::AbstractString
 end
 
-mutable struct Parameter{S<:AbstractString, T<:Real} <: AbstractGFunction
+const Sublattice = Vector{AbstractString}
+const Constitution = Vector{Sublattice}
+
+mutable struct Parameter <: AbstractGFunction
     name::AbstractString
     symbol::Char
-    comb::Vector{Vector{S}}
+    comb::Constitution
     order::Int
-    temp::Tuple{T,T}
+    temp::Tuple{<:Real,<:Real}
     funcstr::AbstractString
 end
 
-const Constitution = Vector{Vector{AbstractString}}
-
-mutable struct Phase{T<:Real}
+mutable struct Phase
     name::AbstractString
     type::AbstractString
-    sites::Vector{T}
+    sites::Vector{<:Real}
     cons::Constitution
     params::Vector{Parameter}
 
     function Phase(name::AbstractString,
                    type::AbstractString,
-                   sites::Vector{T}) where T <: Real
-        phas = new{T}()
+                   sites::Vector{<:Real},
+                   cons::Constitution,
+                   params::Vector{Parameter})
+        return new(name, type, sites, cons, params)
+    end
+
+    function Phase(name::AbstractString,
+                   type::AbstractString,
+                   sites::Vector{<:Real})
+        phas = new()
         phas.name = name
         phas.type = type
         phas.sites = sites
@@ -400,4 +409,68 @@ function Base.print(db::Database)
     end
 end
 
-Base.println(db::Database) = Base.print(db)
+function select(db::Database, elnames::Vector{<:AbstractString})
+    elems = Element[]
+    funcs = Function[]
+    phass = Phase[]
+    types = TypeDefinition[]
+
+    for elem in db.elems
+        if elem.name in elnames
+            push!(elems, elem)
+        end
+    end
+
+    for phas in db.phass
+        phas_selected = select(phas, elnames)
+        isnothing(phas_selected) && continue
+        push!(phass, phas_selected)
+    end
+
+    return Database(elems, funcs, phass, types)
+end
+
+function select(db::Database, elnames::AbstractString)
+    select(db, split(elnames))
+end
+
+function select(phas::Phase, elnames::Vector{<:AbstractString})
+    cons = select(phas.cons, elnames)
+    [] in cons && return nothing
+
+    params = Parameter[]
+    for param in phas.params
+        if iscomposedof(param.comb, vcat(elnames, "Va"))
+            push!(params, param)
+        end
+    end
+    return Phase(phas.name, phas.type, phas.sites, cons, params)
+end
+
+function select(cons::Constitution, elnames::Vector{<:AbstractString})
+    latts = Sublattice[]
+    for latt in cons
+        push!(latts, filter(elname -> elname in elnames, latt))
+    end
+    return latts
+end
+
+function composedof(spec::AbstractString)
+    rms = collect(eachmatch(r"\D{1,2}(?=\d{1,}|$)", spec))
+    isempty(rms) && @error "Unrecognized specie name"
+    return map(rm -> rm.match, rms)
+end
+
+function iscomposedof(spec::AbstractString, elems::Vector{<:AbstractString})
+    comps = composedof(spec)
+    return all(map(elem -> elem in elems, comps))
+end
+
+function iscomposedof(cons::Constitution, elems::Vector{<:AbstractString})
+    for latt in cons
+        for spec in latt
+            !iscomposedof(spec, elems) && return false
+        end
+    end
+    return true
+end
