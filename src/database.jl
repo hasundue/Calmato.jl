@@ -114,10 +114,13 @@ function read_tdb(io::IO)
     while !eof(io)
         block = readline(io)
 
+        println(block)
+
         block = replace(block, '\t' => "") # remove tabs
 
         isempty(block) && continue # blank line
-        block[1] == '$' && continue # comment line
+        !occursin(r"\S+", block) && continue # blank line
+        occursin(r"^\$", block) && continue # comment line
 
         i = findfirst('!', block)
         if isnothing(i)
