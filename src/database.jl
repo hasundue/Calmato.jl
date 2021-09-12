@@ -416,7 +416,7 @@ function select(db::Database, elnames::Vector{<:AbstractString})
     types = TypeDefinition[]
 
     for elem in db.elems
-        if elem.name in elnames
+        if elem.name in vcat(elnames, ["/-", "Va"])
             push!(elems, elem)
         end
     end
