@@ -114,8 +114,6 @@ function read_tdb(io::IO)
     while !eof(io)
         block = readline(io)
 
-        println(block)
-
         block = replace(block, '\t' => "") # remove tabs
 
         isempty(block) && continue # blank line
