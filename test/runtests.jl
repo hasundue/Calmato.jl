@@ -10,5 +10,6 @@ using Test
     print(res)
 
     db = search_db("Cu H O S P Magnusson")
-    select(db, "Cu S P")
+    db = select(db, "Cu S P")
+    print(db)
 end
