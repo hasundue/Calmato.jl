@@ -16,10 +16,19 @@ function search_db(str::AbstractString)
 
     elems = join(elems, ',')
     res = HTTP.get("http://avdwgroup.engin.brown.edu/getdbid.php?element=" * elems)
-    dicts = JSON.parse(String(res.body))
+    dicts = try
+        JSON.parse(String(res.body))
+    catch
+        Dict[]
+    end
 
     for kwrd in kwrds
         dicts = filter(dict -> occursin(kwrd, string(dict)), dicts)
+    end
+
+    if isempty(dicts)
+        println("No database found")
+        return nothing
     end
 
     N = length(dicts)
@@ -40,9 +49,15 @@ function search_db(str::AbstractString)
     if length(dicts) > 1
         print("Select a database to read: ")
         str = readline()
+        isempty(str) && return nothing
         i = parse(Int, str)
     else
         i = 1
+    end
+
+    if i > length(dicts)
+        println("\nInvalid index: $i")
+        return nothing
     end
 
     url = get(dicts[i], "tdburl", "")
