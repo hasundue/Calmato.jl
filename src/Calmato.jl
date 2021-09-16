@@ -9,11 +9,13 @@ import EAGO
 import ForwardDiff
 import Ipopt
 import GLPK
-import MathOptInterface as MOI
+import MathOptInterface
 import HTTP
 import JSON
 import PeriodicTable
 import ZipFile
+
+MOI = MathOptInterface
 
 export read_tdb, search_db, select
 export init_system
