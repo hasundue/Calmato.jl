@@ -471,7 +471,7 @@ end
 function select(cons::Constitution, elnames::Vector{<:AbstractString})
     latts = Sublattice[]
     for latt in cons
-        push!(latts, filter(elname -> elname in elnames, latt))
+        push!(latts, filter(spec -> iscomposedof(spec, elnames), latt))
     end
     return latts
 end
@@ -494,6 +494,23 @@ function iscomposedof(cons::Constitution, elems::Vector{<:AbstractString})
         end
     end
     return true
+end
+
+function stoichiometry(spec::AbstractString)
+    rms = collect(eachmatch(r"(?=\D{1,2}(\d{1,}|$))\D{1,2}", spec))
+    isempty(rms) && @error "Unrecognized specie name"
+    elems = map(rm -> rm.match, rms)
+    stois = map(rm -> rm.captures, rms)
+    dict = Dict{AbstractString,Int}()
+    N = length(elems)
+    @assert length(stois) == N
+    for i in 1:N
+        @assert length(stois[i]) == 1
+        stoi = tryparse(Int, stois[i][1])
+        stoi = isnothing(stoi) ? 1 : stoi
+        push!(dict, elems[i] => stoi)
+    end
+    return dict
 end
 
 function isused(func::GFunction, phas::Phase)
