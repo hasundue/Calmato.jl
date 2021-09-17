@@ -29,6 +29,10 @@ function McCormick.xlogx(d::T) where T <: ForwardDiff.Dual
     return d * log(d)
 end
 
+# function Base.Float64(x::McCormick.MC{1, McCormick.NS})
+#     error(string(x))
+# end
+
 include("database.jl")
 include("tdbdb.jl")
 include("system.jl")

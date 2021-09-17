@@ -69,11 +69,13 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15)
     set_upper_bound(_T, T)
 
     # Fix X[i]
+    # TODO: Using fix() results in X[i] = 0 for some reason
     for i in 1:I
-        fix(_X[i], X[i], force = true)
+        set_lower_bound(_X[i], X[i])
+        set_upper_bound(_X[i], X[i])
     end
 
-    # Set lower and lower bounds for variables
+    # Determine maximum values of Y[k]
     Y_max = [ sum( X[i] for i in 1:I ) / sum( n[k,s] for s in 1:S ) for k in 1:K ]
     for k in 1:K
         set_upper_bound(Y[k], Y_max[k])

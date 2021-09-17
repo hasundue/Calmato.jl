@@ -71,10 +71,10 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     comps = [ stoichiometry(conss[j]) for j in 1:J ]
 
     # Stoichiometry matrix, a[k,s,j,i]
-    a = [ j in constitution[k][s] ? get(comps[j], elems[i].name, 0) : 0
+    a = [ j in constitution[k][s] ? get(comps[j], elems[i].name, 0) : 0 
           for k in 1:K, s in 1:S, j in 1:J, i in 1:I ]
 
-    # Number of sites on sublattice s in phase f, n[f,s]
+    # Number of sites on sublattice s in phase k, n[k,s]
     n = [ phass[k].sites[s] for k in 1:K, s in 1:S ]
 
     #
@@ -135,29 +135,20 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     # instead of defining as many variables as needed, for the sake of programmability
     # and readability of the code, assuming the optimizer is very efficient.
     # 
+    # T: temperature
     # X[i]: molar amount of components
     # Y[k]: molar amount of each phase
     # x[k,i]: molar fraction of component i in phase k
     # y[k,s,j]: site fraction of a constituent j in sublattice s of phase k
     #
-    @variable(model, Tl <= T <= Tu)
-    @variable(model, X[i=1:I] >= 0)
-
-    @variable(model, Y[k=1:K] >= eps)
-
-    # TODO: upper bounds for x
-    @variable(model, eps <= x[k=1:K,i=1:I] <= 1)
-
+    # @variable(model, eps <= x[k=1:K,i=1:I] <= 1)
     @variable(model, eps <= y[k=1:K,s=1:S,j=1:J] <= 1)
 
-    # Relationship between molar amount of components and phases
-    for i in 1:I
-        @constraint(model, sum(sum(n[k,s] for s in 1:S) * Y[k] * x[k,i]  for k in 1:K) == X[i])
-    end
-
-    # Sum of x[k,i] in each phase equals to unity
-    for k in 1:K
-        @constraint(model, sum(x[k,i] for i in 1:I) == 1)
+    # Sum of y[k,j,s] for all constituents in a sublattice equals to unity.
+    for k in 1:K, s in 1:S
+        if constitution[k][s] ≠ []
+            @constraint(model, sum(y[k,s,j] for j in 1:J) == 1)
+        end
     end
 
     # Fix site fractions of zero elements to zero
@@ -167,20 +158,108 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
         end
     end
 
-    # Sum of y[k,j,s] for all constituents in a sublattice equals to unity.
-    for k in 1:K, s in 1:S
-        if constitution[k][s] ≠ []
-            @constraint(model, sum(y[k,s,j] for j in 1:J) == 1)
-        end
+    # Relationship between x and y
+    # for k in 1:K, i in 1:I
+        @NLexpression(model, x[k=1:K,i=1:I],
+                      sum(n[k,s] * sum(a[k,s,j,i] * y[k,s,j] 
+                                       for j in 1:J if a[k,s,j,i] ≠ 0)
+                          for s in 1:S if constitution[k][s] ≠ []) /
+                      sum(n[k,s] * sum(a[k,s,j,i′] * y[k,s,j]
+                                       for j in 1:J, i′ in 1:I if j ≠ J && a[k,s,j,i′] ≠ 0)
+                          for s in 1:S if constitution[k][s] ≠ []))
+    # end
+    
+    for k in 1:K, i in 1:I
+        @NLconstraint(model, eps <= x[k,i] <= 1)
     end
 
-    # Relation between mole fractions of components and site fractions
+    # Sum of x[k,i] in each phase equals to unity
+    for k in 1:K
+        @constraint(model, sum(x[k,i] for i in 1:I) == 1)
+    end
+
+    # Determine maximum values of x[k,i]
+    xmax = zeros(K,I)
     for k in 1:K, i in 1:I
-        @NLconstraint(model, x[k,i] ==
-                      sum(n[k,s] * sum(a[k,s,j,i] * y[k,s,j] for j in 1:J if a[k,s,j,i] ≠ 0)
-                          for s in 1:S if constitution[k][s] ≠ []) /
-                      sum(n[k,s] * sum(a[k,s,j,i′] * y[k,s,j] for j in 1:J, i′ in 1:I if j ≠ J && a[k,s,j,i′] ≠ 0)
-                          for s in 1:S if constitution[k][s] ≠ []))
+        @show k, i
+        @NLobjective(model, Max, x[k,i])
+        optimize!(model)
+        xmax[k,i] = @show value(x[k,i])
+    end
+    return nothing
+
+    # 
+    # Relationship between x[k,i] and y[k,s,j]
+    #
+    # TODO: Assuming that amounts of molecular like constituents are small and
+    # there's no vacancy. This is because Using NLexpression in NLconstraint
+    # result in not obtaining solutions for upper problems.
+    #
+    for k in 1:K, i in 1:I
+        # Numerator
+        expr_s = JuMP.AffExpr[]
+        for s in 1:S
+            constitution[k][s] == [] && continue
+            expr_j = JuMP.AffExpr[]
+            for j in 1:J
+                if a[k,s,j,i] ≠ 0
+                    push!(expr_j, @expression(model, n[k,s] * a[k,s,j,i] * y[k,s,j]))
+                end
+            end
+            M = length(expr_j)
+            M == 0 && continue
+            expr = M > 1 ? @expression(model, sum(expr_j[m] for m in 1:M)) : expr_j[1]
+            push!(expr_s, expr)
+        end
+        M = length(expr_s)
+        numer = M > 1 ? @expression(model, sum(expr_s[m] for m in 1:M)) : expr_s[1]
+
+        @constraint(model, x[k,i] == @expression(model, numer / sum(n[k,s] for s in 1:S)))
+
+        #
+        # TODO: We keep this for the future use
+        #
+        # Denominator
+        # expr_s = JuMP.NonlinearExpression[]
+        # for s in 1:S
+        #     constitution[k][s] == [] && continue
+        #     expr_j = JuMP.NonlinearExpression[]
+        #     for j in 1:J, i′ in 1:I
+        #         if a[k,s,j,i′] ≠ 0 && conss[j] ≠ "Va"
+        #             push!(expr_j, @NLexpression(model, n[k,s] * a[k,s,j,i′] * y[k,s,j]))
+        #         end
+        #     end
+        #     M = length(expr_j)
+        #     expr = M > 1 ? @NLexpression(model, sum(expr_j[m] for m in 1:M)) : expr_j[1]
+        #     push!(expr_s, expr)
+        # end
+        # M = length(expr_s)
+        # denom = M > 1 ? @NLexpression(model, sum(expr_s[m] for m in 1:M)) : expr_s[1]
+        #
+        # x[k,i] = @NLexpression(model, numer / denom)
+    end
+    
+    # TODO: Calling sum for single element results in not obtaining solution
+    # for the upper problem.
+    # 
+    # x[k,i]: molar fraction of component i in phase k
+    # @NLexpression(model, x[k=1:K,i=1:I],
+    #               sum(n[k,s] * sum(a[k,s,j,i] * y[k,s,j] 
+    #                                for j in 1:J
+    #                                if a[k,s,j,i] ≠ 0)
+    #                   for s in 1:S if constitution[k][s] ≠ []) /
+    #               sum(n[k,s] * sum(a[k,s,j,i′] * y[k,s,j]
+    #                                for j in 1:J, i′ in 1:I
+    #                                if conss[j] ≠ "Va" && a[k,s,j,i′] ≠ 0)
+    #                   for s in 1:S if constitution[k][s] ≠ []))
+
+    # Relationship between molar amount of components and phases
+    for i in 1:I
+        if S > 1
+            @constraint(model, sum(sum(n[k,s] for s in 1:S) * Y[k] * x[k,i] for k in 1:K) == X[i])
+        else
+            @constraint(model, sum(n[k,1] * Y[k] * x[k,i] for k in 1:K) == X[i])
+        end
     end
 
     # Register all the functions for parameters

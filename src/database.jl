@@ -176,8 +176,7 @@ function read_tdb(io::IO)
 end
 
 function julialize_funcstr!(arg::AbstractGFunction, funcs::Vector{GFunction})
-    for pair in ["RTLNP" => "R*T*log(P)",
-                 "T*LN(T)" => "xlogx(T)",
+    for pair in ["T*LN(T)" => "xlogx(T)",
                  "LN(" => "log(",
                  "**" => "^",
                  ".+" => ".0+",
