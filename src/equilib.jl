@@ -53,8 +53,8 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15)
     end
 
     # Variables
-    _T = model[:_T] # temperature
-    _X = model[:_X] # molar amount of components
+    _T = model[:T] # temperature
+    _X = model[:X] # molar amount of components
     Y = model[:Y] # moalr amount of phases
     x = model[:x] # molar fraction of components in each phase
     y = model[:y] # site fraction in each sublattice
@@ -68,7 +68,7 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15)
     set_lower_bound(_T, T)
     set_upper_bound(_T, T)
 
-    # Fix _X[i]
+    # Fix X[i]
     for i in 1:I
         fix(_X[i], X[i], force = true)
     end
