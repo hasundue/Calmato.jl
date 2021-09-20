@@ -176,12 +176,20 @@ function read_tdb(io::IO)
 end
 
 function julialize_funcstr!(arg::AbstractGFunction, funcs::Vector{GFunction})
-    for pair in ["T*LN(T)" => "xlogx(T)", "LN(" => "log(", "**" => "^", ".+" => ".0+", ".-" => ".0-", ".*" => ".0*", "./" => ".0/"]
+    for pair in ["RTLNP" => "R*T*log(P)",
+                 "T*LN(T)" => "xlogx(T)",
+                 "LN(" => "log(",
+                 "**" => "^",
+                 ".+" => ".0+",
+                 ".-" => ".0-",
+                 ".*" => ".0*",
+                 "./" => ".0/"]
         arg.funcstr = replace(arg.funcstr, pair)
     end
     for func in funcs
         func.name == arg.name && continue
-        arg.funcstr = replace(arg.funcstr, func.name => "$(func.name)(T)")
+        reg = Regex(func.name * "(?=\\W)")
+        arg.funcstr = replace(arg.funcstr, reg => "$(func.name)(T)")
     end
 end
 
@@ -414,7 +422,6 @@ function select(db::Database, elnames::Vector{<:AbstractString})
     elems = Element[]
     funcs = GFunction[]
     phass = Phase[]
-    types = TypeDefinition[]
 
     for elem in db.elems
         if elem.name in vcat(elnames, ["/-", "Va"])
@@ -448,7 +455,7 @@ function select(db::Database, elnames::Vector{<:AbstractString})
     while found
         found = any(push_func!, db.funcs)
     end
-    return Database(elems, funcs, phass, types)
+    return Database(elems, funcs, phass, db.types)
 end
 
 function select(db::Database, elnames::AbstractString)
