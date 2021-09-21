@@ -10,7 +10,7 @@ struct System
     model::Model # JuMP model
 end
 
-function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase}; eps=2e-8)
+function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase})
     # We do this because we modify Phase structs destructively
     phass = deepcopy(phass)
 
@@ -94,6 +94,8 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     # Ipopt as the upper solver in EAGO
     #
     ipopt = Ipopt.Optimizer()
+
+    eps = 2e-8 # TODO: parameterize this
 
     MOI.set(ipopt, MOI.RawParameter("tol"), 1e-2)
     MOI.set(ipopt, MOI.RawParameter("dual_inf_tol"), 1e-6)
@@ -367,7 +369,7 @@ function disorder_id(db::Database, phas::Phase)
     return nothing
 end
 
-function init_system(db::Database; eps=2e-8)
+function init_system(db::Database)
     elems = Vector{Element}()
     phass = Vector{Phase}()
 
@@ -380,7 +382,7 @@ function init_system(db::Database; eps=2e-8)
         push!(elems, el)
     end
 
-    return init_system(db, elems, phass, eps=eps)
+    return init_system(db, elems, phass)
 end
 
 function equiatom(sys::System)
