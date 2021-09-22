@@ -21,6 +21,7 @@ function Base.display(res::EquilibResult)
         cons = filter(latt -> !isempty(latt), phas.cons)
         S = length(cons)
         S < 2 && continue
+        !any(latt -> length(latt) > 1, cons) && continue
         for s in 1:S
             phas.cons[s] == [] && continue
             if length(filter(l -> l ≠ [], phas.cons)) > 1
