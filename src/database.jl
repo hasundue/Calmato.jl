@@ -70,7 +70,7 @@ function constitutionstring(phas::Phase, s::Int)
     end
     n = phas.sites[s]
     if n ≠ one(n)
-        str *= string(n)
+        str *= subscript(n)
     end
     return str
 end

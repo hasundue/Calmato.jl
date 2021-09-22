@@ -29,6 +29,28 @@ function McCormick.xlogx(d::T) where T <: ForwardDiff.Dual
     return d * log(d)
 end
 
+function subscript(c::Char)
+    return Char(0x2080 + parse(Int, c))
+end
+
+function subscript(i::Int)
+    str = string(i)
+    return map(subscript, str)
+end
+
+function subscript(x::Float64)
+    str = string(x)
+    sub = ""
+    for c in str
+        if c == '.'
+            sub *= c
+        else
+            sub *= subscript(c)
+        end
+    end
+    return sub
+end
+
 include("database.jl")
 include("tdbdb.jl")
 include("system.jl")
