@@ -272,14 +272,12 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
             end
         end
 
-        G = @NLexpression(model, sum(Gs_param[i] for i in 1:m))
+        G = m > 1 ? @NLexpression(model, sum(Gs_param[i] for i in 1:m)) : Gs_param[1]
 
         # Ideal entropy of configuration
-        if !disordered
-            G = @NLexpression(model, G + R*T*sum(n[k,s] * xlogx(y[k,s,j])
-                                                 for s in 1:S, j in 1:J
-                                                 if j in constitution[k][s] &&
-                                                 length(constitution[k][s]) > 1 ))
+        nonzero = [(s,j) for s in 1:S, j in 1:J if j in constitution[k][s] && length(constitution[k][s]) > 1]
+        if !disordered && length(nonzero) > 1
+            G = @NLexpression(model, G + R*T*sum(n[k,s] * xlogx(y[k,s,j]) for (s,j) in nonzero))
         end
 
         return G
