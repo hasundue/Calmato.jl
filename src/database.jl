@@ -489,7 +489,7 @@ end
 function select(cons::Constitution, elnames::Vector{<:AbstractString})
     latts = Sublattice[]
     for latt in cons
-        push!(latts, filter(spec -> iscomposedof(spec, elnames), latt))
+        push!(latts, filter(spec -> iscomposedof(spec, vcat(elnames, "Va")), latt))
     end
     return latts
 end
