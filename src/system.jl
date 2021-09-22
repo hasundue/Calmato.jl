@@ -330,6 +330,16 @@ function init_system(db::Database)
     phass = Vector{Phase}()
 
     for ph in db.phass
+        if ph.state == 'G'
+            @warn "Gaseous phase is not supported yet. Exclude $(ph.name)."
+            continue
+        end
+        if any(latt -> "Va" in latt, ph.cons)
+            @warn "$(ph.name) includes vacancies. Calculation may be inaccurate."
+        end
+        if any(latt -> any(spec -> length(stoichiometry(spec)) > 1, latt), ph.cons)
+            @warn "$(ph.name) includes molcular-like constituents. Calculation may be inaccurate."
+        end
         push!(phass, ph)
     end
 
