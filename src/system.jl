@@ -251,7 +251,6 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
             s_solo = findall(x -> length(x) == 1, comb)
             solo = [ (s, comb[s][1]) for s in s_solo ]
             for (s, j) in solo
-                length(constitution[k][s]) < 2 && continue
                 Gs_param[m] = 
                 @NLexpression(model, Gs_param[m] * ( disordered ? x[k,j] : y[k,s,j] ))
             end
