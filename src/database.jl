@@ -483,7 +483,7 @@ function select(phas::Phase, elnames::Vector{<:AbstractString})
             push!(params, param)
         end
     end
-    return Phase(phas.name, phas.type, phas.sites, cons, params)
+    return Phase(phas.name, phas.state, phas.type, phas.sites, cons, params)
 end
 
 function select(cons::Constitution, elnames::Vector{<:AbstractString})
