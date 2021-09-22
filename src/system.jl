@@ -33,6 +33,7 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     I = length(elems) # number of components
     conss = [ elems[i].name for i in 1:I ]
 
+    # Register non-element constituents
     for phas in phass
         for param in phas.params
             for latt in param.comb
@@ -250,34 +251,36 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
             s_solo = findall(x -> length(x) == 1, comb)
             solo = [ (s, comb[s][1]) for s in s_solo ]
             for (s, j) in solo
-                if length(constitution[k][s]) > 1
-                    Gs_param[m] = @NLexpression(model, Gs_param[m] * ( disordered ? x[k,j] : y[k,s,j] ))
-                end
+                length(constitution[k][s]) < 2 && continue
+                Gs_param[m] = @NLexpression(model, Gs_param[m] * ( disordered ? x[k,j] : y[k,s,j] ))
             end
 
             # Paired constituents
             s_duo = findall(latt -> length(latt) == 2, comb)
             @assert length(s_duo) ≤ 1
-            if length(s_duo) == 1
-                s = s_duo[1]
-                i = comb[s][1]
-                j = comb[s][2]
-                Gs_param[m] = disordered ? @NLexpression(model, Gs_param[m] * x[k,i] * x[k,j]) :
-                                           @NLexpression(model, Gs_param[m] * y[k,s,i] * y[k,s,j])
-                for ν in 1:l 
-                    Gs_param[m] = disordered ? @NLexpression(model, Gs_param[m] * ( x[k,i] - x[k,j] )) :
-                                               @NLexpression(model, Gs_param[m] * ( y[k,s,i] - y[k,s,j] ))
-                end
+            length(s_duo) == 0 && continue
+            s = s_duo[1]
+            i = comb[s][1]
+            j = comb[s][2]
+            Gs_param[m] = disordered ? @NLexpression(model, Gs_param[m] * x[k,i] * x[k,j]) :
+                                       @NLexpression(model, Gs_param[m] * y[k,s,i] * y[k,s,j])
+            for ν in 1:l 
+                Gs_param[m] = disordered ? @NLexpression(model, Gs_param[m] * ( x[k,i] - x[k,j] )) :
+                                           @NLexpression(model, Gs_param[m] * ( y[k,s,i] - y[k,s,j] ))
             end
         end
 
+        G = @NLexpression(model, sum(Gs_param[i] for i in 1:m))
+
         # Ideal entropy of configuration
-        if disordered
-            return @NLexpression(model, sum(Gs_param[i] for i in 1:m))
-        else
-            return @NLexpression(model, sum(Gs_param[i] for i in 1:m) + R * T * sum( n[k,s] * xlogx(y[k,s,j])
-                for s in 1:S, j in 1:J if j in constitution[k][s] && length(constitution[k][s]) > 1 ))
+        if !disordered
+            G = @NLexpression(model, G + R*T*sum(n[k,s] * xlogx(y[k,s,j])
+                                                 for s in 1:S, j in 1:J
+                                                 if j in constitution[k][s] &&
+                                                 length(constitution[k][s]) > 1 ))
         end
+
+        return G
     end
 
     # Gibbs energy contribution from each phase
