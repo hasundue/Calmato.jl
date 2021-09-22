@@ -55,14 +55,19 @@ end
 
 function constitutionstring(phas::Phase, s::Int)
     cons = phas.cons
-    str = '('
+    str = ""
+    if length(cons[s]) > 1
+        str *= '('
+    end
     for elname in cons[s]
         str *= elname
         if elname ≠ cons[s][end]
             str *= ','
         end
     end
-    str *= ')'
+    if length(cons[s]) > 1
+        str *= ')'
+    end
     n = phas.sites[s]
     if n ≠ one(n)
         str *= string(n)
