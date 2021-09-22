@@ -28,24 +28,28 @@ end
 
 mutable struct Phase
     name::AbstractString
+    state::Char
     type::AbstractString
     sites::Vector{<:Real}
     cons::Constitution
     params::Vector{Parameter}
 
     function Phase(name::AbstractString,
+                   state::Char,
                    type::AbstractString,
                    sites::Vector{<:Real},
                    cons::Constitution,
                    params::Vector{Parameter})
-        return new(name, type, sites, cons, params)
+        return new(name, state, type, sites, cons, params)
     end
 
     function Phase(name::AbstractString,
+                   state::Char,
                    type::AbstractString,
                    sites::Vector{<:Real})
         phas = new()
         phas.name = name
+        phas.state = state
         phas.type = type
         phas.sites = sites
         phas.params = Parameter[]
@@ -291,9 +295,12 @@ function parse_phase(text::AbstractString)
         sites = parse.(Float64, strs[5:end])
     end
     @assert length(sites) == N
-    name = replace(strs[2], " " => "")
-    name = split(name, ':')[1]
-    return Phase(name, model, sites)
+    text = replace(strs[2], " " => "")
+    strs = split(text, ':')
+    @assert length(strs) ≤ 2
+    name = strs[1]
+    state = length(strs) == 1 ? 'S' : strs[2][1]
+    return Phase(name, state[1], model, sites)
 end
 
 function parse_constituent(text::AbstractString)
