@@ -193,69 +193,23 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     # 
     # Relationship between x[k,i] and y[k,s,j]
     #
-    # TODO: Assuming that amounts of molecular like constituents are small and
+    # TODO: We Assume that amounts of molecular like constituents are small and
     # there's no vacancy. This is because Using NLexpression in NLconstraint
-    # result in not obtaining solutions for upper problems.
-    #
-    for k in 1:K, i in 1:I
-        # Numerator
-        expr_s = JuMP.AffExpr[]
-        for s in 1:S
-            constitution[k][s] == [] && continue
-            expr_j = JuMP.AffExpr[]
-            for j in 1:J
-                if a[k,s,j,i] ≠ 0
-                    push!(expr_j, @expression(model, n[k,s] * a[k,s,j,i] * y[k,s,j]))
-                end
-            end
-            M = length(expr_j)
-            M == 0 && continue
-            expr = M > 1 ? @expression(model, sum(expr_j[m] for m in 1:M)) : expr_j[1]
-            push!(expr_s, expr)
-        end
-        M = length(expr_s)
-        numer = M > 1 ? @expression(model, sum(expr_s[m] for m in 1:M)) : expr_s[1]
-
-        @constraint(model, x[k,i] == @expression(model, numer / sum(n[k,s] for s in 1:S)))
-
-        #
-        # TODO: We keep this for the future use
-        #
-        # Denominator
-        # expr_s = JuMP.NonlinearExpression[]
-        # for s in 1:S
-        #     constitution[k][s] == [] && continue
-        #     expr_j = JuMP.NonlinearExpression[]
-        #     for j in 1:J, i′ in 1:I
-        #         if a[k,s,j,i′] ≠ 0 && conss[j] ≠ "Va"
-        #             push!(expr_j, @NLexpression(model, n[k,s] * a[k,s,j,i′] * y[k,s,j]))
-        #         end
-        #     end
-        #     M = length(expr_j)
-        #     expr = M > 1 ? @NLexpression(model, sum(expr_j[m] for m in 1:M)) : expr_j[1]
-        #     push!(expr_s, expr)
-        # end
-        # M = length(expr_s)
-        # denom = M > 1 ? @NLexpression(model, sum(expr_s[m] for m in 1:M)) : expr_s[1]
-        #
-        # x[k,i] = @NLexpression(model, numer / denom)
-    end
-    
-    # TODO: Calling sum for single element results in not obtaining solution
-    # for the upper problem.
+    # results in not obtaining solutions for upper problems.
     # 
-    # x[k,i]: molar fraction of component i in phase k
-    # for k in 1:K, i in 1:I
-    #     @NLconstraint(model, x[k,i] ==
-    #                   sum(n[k,s] * sum(a[k,s,j,i] * y[k,s,j] 
-    #                                    for j in 1:J
-    #                                    if a[k,s,j,i] ≠ 0)
-    #                       for s in 1:S if constitution[k][s] ≠ []) /
-    #                   sum(n[k,s] * sum(a[k,s,j,i′] * y[k,s,j]
-    #                                    for j in 1:J, i′ in 1:I
-    #                                    if conss[j] ≠ "Va" && a[k,s,j,i′] ≠ 0)
-    #                       for s in 1:S if constitution[k][s] ≠ []))
-    # end
+    for k in 1:K, i in 1:I
+        @constraint(model, x[k,i] ==
+                    sum(n[k,s] * sum(a[k,s,j,i] * y[k,s,j] 
+                                     for j in 1:J
+                                     if a[k,s,j,i] ≠ 0)
+                        for s in 1:S if constitution[k][s] ≠ []) /
+                    sum(n[k,s] for s in 1:S))
+                    # TODO: Use this as the denominator
+                    # sum(n[k,s] * sum(a[k,s,j,i′] * y[k,s,j]
+                    #                  for j in 1:J, i′ in 1:I
+                    #                  if conss[j] ≠ "Va" && a[k,s,j,i′] ≠ 0)
+                    #     for s in 1:S if constitution[k][s] ≠ []))
+    end
 
     # Relationship between molar amount of components and phases
     for i in 1:I
