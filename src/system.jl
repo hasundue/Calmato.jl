@@ -252,7 +252,8 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
             solo = [ (s, comb[s][1]) for s in s_solo ]
             for (s, j) in solo
                 length(constitution[k][s]) < 2 && continue
-                Gs_param[m] = @NLexpression(model, Gs_param[m] * ( disordered ? x[k,j] : y[k,s,j] ))
+                Gs_param[m] = 
+                @NLexpression(model, Gs_param[m] * ( disordered ? x[k,j] : y[k,s,j] ))
             end
 
             # Paired constituents
@@ -262,11 +263,13 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
             s = s_duo[1]
             i = comb[s][1]
             j = comb[s][2]
-            Gs_param[m] = disordered ? @NLexpression(model, Gs_param[m] * x[k,i] * x[k,j]) :
-                                       @NLexpression(model, Gs_param[m] * y[k,s,i] * y[k,s,j])
+            Gs_param[m] = disordered ? 
+            @NLexpression(model, Gs_param[m] * x[k,i] * x[k,j]) :
+            @NLexpression(model, Gs_param[m] * y[k,s,i] * y[k,s,j])
             for ν in 1:l 
-                Gs_param[m] = disordered ? @NLexpression(model, Gs_param[m] * ( x[k,i] - x[k,j] )) :
-                                           @NLexpression(model, Gs_param[m] * ( y[k,s,i] - y[k,s,j] ))
+                Gs_param[m] = disordered ? 
+                @NLexpression(model, Gs_param[m] * ( x[k,i] - x[k,j] )) :
+                @NLexpression(model, Gs_param[m] * ( y[k,s,i] - y[k,s,j] ))
             end
         end
 
