@@ -245,23 +245,21 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     # for the upper problem.
     # 
     # x[k,i]: molar fraction of component i in phase k
-    # @NLexpression(model, x[k=1:K,i=1:I],
-    #               sum(n[k,s] * sum(a[k,s,j,i] * y[k,s,j] 
-    #                                for j in 1:J
-    #                                if a[k,s,j,i] ≠ 0)
-    #                   for s in 1:S if constitution[k][s] ≠ []) /
-    #               sum(n[k,s] * sum(a[k,s,j,i′] * y[k,s,j]
-    #                                for j in 1:J, i′ in 1:I
-    #                                if conss[j] ≠ "Va" && a[k,s,j,i′] ≠ 0)
-    #                   for s in 1:S if constitution[k][s] ≠ []))
+    # for k in 1:K, i in 1:I
+    #     @NLconstraint(model, x[k,i] ==
+    #                   sum(n[k,s] * sum(a[k,s,j,i] * y[k,s,j] 
+    #                                    for j in 1:J
+    #                                    if a[k,s,j,i] ≠ 0)
+    #                       for s in 1:S if constitution[k][s] ≠ []) /
+    #                   sum(n[k,s] * sum(a[k,s,j,i′] * y[k,s,j]
+    #                                    for j in 1:J, i′ in 1:I
+    #                                    if conss[j] ≠ "Va" && a[k,s,j,i′] ≠ 0)
+    #                       for s in 1:S if constitution[k][s] ≠ []))
+    # end
 
     # Relationship between molar amount of components and phases
     for i in 1:I
-        if S > 1
-            @constraint(model, sum(sum(n[k,s] for s in 1:S) * Y[k] * x[k,i] for k in 1:K) == X[i])
-        else
-            @constraint(model, sum(n[k,1] * Y[k] * x[k,i] for k in 1:K) == X[i])
-        end
+        @constraint(model, sum(sum(n[k,s] for s in 1:S) * Y[k] * x[k,i] for k in 1:K) == X[i])
     end
 
     # Register all the functions for parameters
