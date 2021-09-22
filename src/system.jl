@@ -143,6 +143,9 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     # x[k,i]: molar fraction of component i in phase k
     # y[k,s,j]: site fraction of a constituent j in sublattice s of phase k
     #
+    @variable(model, Tl <= T <= Tu)
+    @variable(model, X[i=1:I] >= 0)
+    @variable(model, Y[k=1:K] >= eps)
     # @variable(model, eps <= x[k=1:K,i=1:I] <= 1)
     @variable(model, eps <= y[k=1:K,s=1:S,j=1:J] <= 1)
 
@@ -191,25 +194,23 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     return nothing
 
     # 
-    # Relationship between x[k,i] and y[k,s,j]
+    # x[k,i]: molar fraction of component i in phase k
     #
     # TODO: We Assume that amounts of molecular like constituents are small and
     # there's no vacancy. This is because Using NLexpression in NLconstraint
     # results in not obtaining solutions for upper problems.
     # 
-    for k in 1:K, i in 1:I
-        @constraint(model, x[k,i] ==
-                    sum(n[k,s] * sum(a[k,s,j,i] * y[k,s,j] 
-                                     for j in 1:J
-                                     if a[k,s,j,i] ≠ 0)
-                        for s in 1:S if constitution[k][s] ≠ []) /
-                    sum(n[k,s] for s in 1:S))
-                    # TODO: Use this as the denominator
-                    # sum(n[k,s] * sum(a[k,s,j,i′] * y[k,s,j]
-                    #                  for j in 1:J, i′ in 1:I
-                    #                  if conss[j] ≠ "Va" && a[k,s,j,i′] ≠ 0)
-                    #     for s in 1:S if constitution[k][s] ≠ []))
-    end
+    @expression(model, x[k=1:K,i=1:I],
+                sum(n[k,s] * sum(a[k,s,j,i] * y[k,s,j] 
+                                 for j in 1:J
+                                 if a[k,s,j,i] ≠ 0)
+                    for s in 1:S if constitution[k][s] ≠ []) /
+                sum(n[k,s] for s in 1:S))
+                # TODO: Use this as the denominator
+                # sum(n[k,s] * sum(a[k,s,j,i′] * y[k,s,j]
+                #                  for j in 1:J, i′ in 1:I
+                #                  if conss[j] ≠ "Va" && a[k,s,j,i′] ≠ 0)
+                #     for s in 1:S if constitution[k][s] ≠ []))
 
     # Relationship between molar amount of components and phases
     for i in 1:I
