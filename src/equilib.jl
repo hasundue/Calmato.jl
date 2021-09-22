@@ -14,7 +14,7 @@ function Base.display(res::EquilibResult)
     for k in 1:K
         phas = res.sys.phass[k]
         res.Y[k] < 1e-5 && continue
-        @printf "%s: %.4f mol\n" phas.name res.Y[k]
+        @printf "%s; %s: %.4f mol\n" phas.name constitutionstring(phas) res.Y[k]
         for i in 1:I
             @printf "\t%s: %.4f\n" res.sys.elems[i].name res.x[k,i]
         end
