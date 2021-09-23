@@ -164,36 +164,6 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
         end
     end
 
-    # Relationship between x and y
-    # for k in 1:K, i in 1:I
-        @NLexpression(model, x[k=1:K,i=1:I],
-                      sum(n[k,s] * sum(a[k,s,j,i] * y[k,s,j] 
-                                       for j in 1:J if a[k,s,j,i] ≠ 0)
-                          for s in 1:S if constitution[k][s] ≠ []) /
-                      sum(n[k,s] * sum(a[k,s,j,i′] * y[k,s,j]
-                                       for j in 1:J, i′ in 1:I if j ≠ J && a[k,s,j,i′] ≠ 0)
-                          for s in 1:S if constitution[k][s] ≠ []))
-    # end
-    
-    for k in 1:K, i in 1:I
-        @NLconstraint(model, eps <= x[k,i] <= 1)
-    end
-
-    # Sum of x[k,i] in each phase equals to unity
-    for k in 1:K
-        @constraint(model, sum(x[k,i] for i in 1:I) == 1)
-    end
-
-    # Determine maximum values of x[k,i]
-    xmax = zeros(K,I)
-    for k in 1:K, i in 1:I
-        @show k, i
-        @NLobjective(model, Max, x[k,i])
-        optimize!(model)
-        xmax[k,i] = @show value(x[k,i])
-    end
-    return nothing
-
     # 
     # x[k,i]: molar fraction of component i in phase k
     #
@@ -335,7 +305,8 @@ function init_system(db::Database)
             continue
         end
         if any(latt -> "Va" in latt, ph.cons)
-            @warn "$(ph.name) includes vacancies. Calculation may be inaccurate."
+            @warn "$(ph.name) includes vacancies. Exclude the phase."
+            continue
         end
         if any(latt -> any(spec -> length(stoichiometry(spec)) > 1, latt), ph.cons)
             @warn "$(ph.name) includes molcular-like constituents. Calculation may be inaccurate."
