@@ -35,7 +35,7 @@ print(db)
 Database:
         Elements: 4
                 /-
-                VA
+                Va
                 Cu
                 Zn
         Functions: 10
@@ -62,7 +62,7 @@ Database:
                         L(Cu,Zn;0)
                         L(Cu,Zn;1)
                         L(Cu,Zn;2)
-                3: Bcc_B2; (Cu,Zn)0.5(Cu,Zn)0.5
+                3: Bcc_B2; (Cu,Zn)₀.₅(Cu,Zn)₀.₅
                         ...
 ```
 
@@ -88,18 +88,16 @@ equilib(sys, X, T)
 ```
 
 ```terminal
-Gamma: 0.0289 mol
+Gamma; Cu₄(Cu,Zn)₆(Cu,Zn)₁₆: 0.1041
         Cu: 0.3242
         Zn: 0.6758
-        (Cu)4
-                Cu: 1.0000
-        (Cu,Zn)6
+        (Cu,Zn)₆
                 Cu: 0.7363
                 Zn: 0.2637
-        (Cu,Zn)16
+        (Cu,Zn)₁₆
                 Cu: 0.0007
                 Zn: 0.9993
-Eps: 0.2486 mol
+Eps; (Cu,Zn): 0.8959
         Cu: 0.2269
         Zn: 0.7731
 ```
