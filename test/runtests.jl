@@ -10,6 +10,11 @@ using Test
     print(res)
 
     db = search_db("Cu H O S P Magnusson")
-    db = select(db, "Cu S P")
     print(db)
+    db = select(db, "Cu S")
+    print(db)
+    sys = init_system(db)
+    print(sys)
+    res = equilib(sys, [0.99, 0.01], 900)
+    print(res)
 end

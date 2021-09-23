@@ -28,24 +28,28 @@ end
 
 mutable struct Phase
     name::AbstractString
+    state::Char
     type::AbstractString
     sites::Vector{<:Real}
     cons::Constitution
     params::Vector{Parameter}
 
     function Phase(name::AbstractString,
+                   state::Char,
                    type::AbstractString,
                    sites::Vector{<:Real},
                    cons::Constitution,
                    params::Vector{Parameter})
-        return new(name, type, sites, cons, params)
+        return new(name, state, type, sites, cons, params)
     end
 
     function Phase(name::AbstractString,
+                   state::Char,
                    type::AbstractString,
                    sites::Vector{<:Real})
         phas = new()
         phas.name = name
+        phas.state = state
         phas.type = type
         phas.sites = sites
         phas.params = Parameter[]
@@ -55,17 +59,22 @@ end
 
 function constitutionstring(phas::Phase, s::Int)
     cons = phas.cons
-    str = '('
+    str = ""
+    if length(cons[s]) > 1
+        str *= '('
+    end
     for elname in cons[s]
         str *= elname
         if elname ≠ cons[s][end]
             str *= ','
         end
     end
-    str *= ')'
+    if length(cons[s]) > 1
+        str *= ')'
+    end
     n = phas.sites[s]
     if n ≠ one(n)
-        str *= string(n)
+        str *= subscript(n)
     end
     return str
 end
@@ -176,12 +185,19 @@ function read_tdb(io::IO)
 end
 
 function julialize_funcstr!(arg::AbstractGFunction, funcs::Vector{GFunction})
-    for pair in ["T*LN(T)" => "xlogx(T)", "LN(" => "log(", "**" => "^", ".+" => ".0+", ".-" => ".0-", ".*" => ".0*", "./" => ".0/"]
+    for pair in ["T*LN(T)" => "xlogx(T)",
+                 "LN(" => "log(",
+                 "**" => "^",
+                 ".+" => ".0+",
+                 ".-" => ".0-",
+                 ".*" => ".0*",
+                 "./" => ".0/"]
         arg.funcstr = replace(arg.funcstr, pair)
     end
     for func in funcs
         func.name == arg.name && continue
-        arg.funcstr = replace(arg.funcstr, func.name => "$(func.name)(T)")
+        reg = Regex(func.name * "(?=\\W)")
+        arg.funcstr = replace(arg.funcstr, reg => "$(func.name)(T)")
     end
 end
 
@@ -279,9 +295,12 @@ function parse_phase(text::AbstractString)
         sites = parse.(Float64, strs[5:end])
     end
     @assert length(sites) == N
-    name = replace(strs[2], " " => "")
-    name = split(name, ':')[1]
-    return Phase(name, model, sites)
+    text = replace(strs[2], " " => "")
+    strs = split(text, ':')
+    @assert length(strs) ≤ 2
+    name = strs[1]
+    state = length(strs) == 1 ? 'S' : strs[2][1]
+    return Phase(name, state[1], model, sites)
 end
 
 function parse_constituent(text::AbstractString)
@@ -414,7 +433,6 @@ function select(db::Database, elnames::Vector{<:AbstractString})
     elems = Element[]
     funcs = GFunction[]
     phass = Phase[]
-    types = TypeDefinition[]
 
     for elem in db.elems
         if elem.name in vcat(elnames, ["/-", "Va"])
@@ -448,7 +466,7 @@ function select(db::Database, elnames::Vector{<:AbstractString})
     while found
         found = any(push_func!, db.funcs)
     end
-    return Database(elems, funcs, phass, types)
+    return Database(elems, funcs, phass, db.types)
 end
 
 function select(db::Database, elnames::AbstractString)
@@ -465,13 +483,13 @@ function select(phas::Phase, elnames::Vector{<:AbstractString})
             push!(params, param)
         end
     end
-    return Phase(phas.name, phas.type, phas.sites, cons, params)
+    return Phase(phas.name, phas.state, phas.type, phas.sites, cons, params)
 end
 
 function select(cons::Constitution, elnames::Vector{<:AbstractString})
     latts = Sublattice[]
     for latt in cons
-        push!(latts, filter(elname -> elname in elnames, latt))
+        push!(latts, filter(spec -> iscomposedof(spec, vcat(elnames, "Va")), latt))
     end
     return latts
 end
@@ -494,6 +512,23 @@ function iscomposedof(cons::Constitution, elems::Vector{<:AbstractString})
         end
     end
     return true
+end
+
+function stoichiometry(spec::AbstractString)
+    rms = collect(eachmatch(r"(?=\D{1,2}(\d{1,}|$))\D{1,2}", spec))
+    isempty(rms) && @error "Unrecognized specie name"
+    elems = map(rm -> rm.match, rms)
+    stois = map(rm -> rm.captures, rms)
+    dict = Dict{AbstractString,Int}()
+    N = length(elems)
+    @assert length(stois) == N
+    for i in 1:N
+        @assert length(stois[i]) == 1
+        stoi = tryparse(Int, stois[i][1])
+        stoi = isnothing(stoi) ? 1 : stoi
+        push!(dict, elems[i] => stoi)
+    end
+    return dict
 end
 
 function isused(func::GFunction, phas::Phase)

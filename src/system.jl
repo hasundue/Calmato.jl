@@ -10,7 +10,7 @@ struct System
     model::Model # JuMP model
 end
 
-function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase}; eps = 2e-8)
+function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase})
     # We do this because we modify Phase structs destructively
     phass = deepcopy(phass)
 
@@ -27,12 +27,23 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
             Tu = param.temp[2] < Tu ? param.temp[2] : Tu
         end
     end
-    temp = (Tl,Tu)
+    temp = (Tl, Tu)
 
-    # TODO: Consitituents are identical to components in the current version of Calmato.
-    conss = elems
-
+    # The elements always exists as consitituents
     I = length(elems) # number of components
+    conss = [ elems[i].name for i in 1:I ]
+
+    # Register non-element constituents
+    for phas in phass
+        for param in phas.params
+            for latt in param.comb
+                for cons in latt
+                    !(cons in conss) && push!(conss, cons)
+                end
+            end
+        end
+    end
+
     J = length(conss) # number of constituents
     K = length(phass) # number of phases
 
@@ -42,7 +53,7 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     # Indexing constituent
     cons_ids = Dict{AbstractString,Int}()
     for j in 1:J
-        push!(cons_ids, conss[j].name => j)
+        push!(cons_ids, conss[j] => j)
     end
 
     # Put zero or empty elements in each sublattice for later use
@@ -57,7 +68,14 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     # Reconstuction of constitution vector into an array of Int
     constitution = [ map.(name -> get(cons_ids, name, 0), phass[k].cons) for k in 1:K ]
 
-    # Number of sites on sublattice s in phase f, n[f,s]
+    # Chemical stoichiometry of constituents
+    comps = [ stoichiometry(conss[j]) for j in 1:J ]
+
+    # Stoichiometry matrix, a[k,s,j,i]
+    a = [ j in constitution[k][s] ? get(comps[j], elems[i].name, 0) : 0 
+          for k in 1:K, s in 1:S, j in 1:J, i in 1:I ]
+
+    # Number of sites on sublattice s in phase k, n[k,s]
     n = [ phass[k].sites[s] for k in 1:K, s in 1:S ]
 
     #
@@ -77,6 +95,8 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     # Ipopt as the upper solver in EAGO
     #
     ipopt = Ipopt.Optimizer()
+
+    eps = 2e-8 # TODO: parameterize this
 
     MOI.set(ipopt, MOI.RawParameter("tol"), 1e-2)
     MOI.set(ipopt, MOI.RawParameter("dual_inf_tol"), 1e-6)
@@ -118,37 +138,17 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     # instead of defining as many variables as needed, for the sake of programmability
     # and readability of the code, assuming the optimizer is very efficient.
     # 
-    # _X[i]: molar amount of components
+    # T: temperature
+    # X[i]: molar amount of components
     # Y[k]: molar amount of each phase
-    # x[k,i]: molar fraction of component i in phase f
-    # y[k,s,j]: site fraction of a constituent j in sublattice s of phase f
+    # x[k,i]: molar fraction of component i in phase k
+    # y[k,s,j]: site fraction of a constituent j in sublattice s of phase k
     #
-    @variable(model, Tl <= _T <= Tu)
-    @variable(model, _X[i=1:I] >= 0)
-
+    @variable(model, Tl <= T <= Tu)
+    @variable(model, X[i=1:I] >= 0)
     @variable(model, Y[k=1:K] >= eps)
-
-    x_max = [ sum( n[k,s] for s in 1:S if i in constitution[k][s] ) / sum( n[k,s] for s in 1:S ) for k in 1:K, i in 1:I ]
-    @variable(model, eps <= x[k=1:K,i=1:I] <= x_max[k,i])
-
+    # @variable(model, eps <= x[k=1:K,i=1:I] <= 1)
     @variable(model, eps <= y[k=1:K,s=1:S,j=1:J] <= 1)
-
-    # Relationship between molar amount of components and phases
-    for i in 1:I
-        @constraint(model, sum( sum( n[k,s] for s in 1:S ) * Y[k] * x[k,i]  for k in 1:K ) == _X[i])
-    end
-
-    # Sum of x[k,i] in each phase equals to unity
-    for k in 1:K
-        @constraint(model, sum( x[k,i] for i in 1:I ) == 1)
-    end
-
-    # Fix site fractions of zero elements to zero
-    for k in 1:K, s in 1:S, j in 1:J
-        if !in(j, constitution[k][s])
-            fix(y[k,s,j], 0, force = true)
-        end
-    end
 
     # Sum of y[k,j,s] for all constituents in a sublattice equals to unity.
     for k in 1:K, s in 1:S
@@ -157,10 +157,35 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
         end
     end
 
-    # Relation between mole fractions of components and site fractions
-    for k in 1:K, i in 1:I
-        @constraint(model, x[k,i] == sum( n[k,s] * y[k,s,i] for s in 1:S if constitution[k][s] ≠ [] )
-                                        / sum( n[k,s] for s in 1:S if constitution[k][s] ≠ [] ))
+    # Fix site fractions of zero elements to zero
+    for k in 1:K, s in 1:S, j in 1:J
+        if !in(j, constitution[k][s])
+            fix(y[k,s,j], 0, force=true)
+        end
+    end
+
+    # 
+    # x[k,i]: molar fraction of component i in phase k
+    #
+    # TODO: We Assume that amounts of molecular like constituents are small and
+    # there's no vacancy. This is because Using NLexpression in NLconstraint
+    # results in not obtaining solutions for upper problems.
+    # 
+    @expression(model, x[k=1:K,i=1:I],
+                sum(n[k,s] * sum(a[k,s,j,i] * y[k,s,j] 
+                                 for j in 1:J
+                                 if a[k,s,j,i] ≠ 0)
+                    for s in 1:S if constitution[k][s] ≠ []) /
+                sum(n[k,s] for s in 1:S))
+                # TODO: Use this as the denominator
+                # sum(n[k,s] * sum(a[k,s,j,i′] * y[k,s,j]
+                #                  for j in 1:J, i′ in 1:I
+                #                  if conss[j] ≠ "Va" && a[k,s,j,i′] ≠ 0)
+                #     for s in 1:S if constitution[k][s] ≠ []))
+
+    # Relationship between molar amount of components and phases
+    for i in 1:I
+        @constraint(model, sum(sum(n[k,s] for s in 1:S) * Y[k] * x[k,i] for k in 1:K) == X[i])
     end
 
     # Register all the functions for parameters
@@ -169,11 +194,15 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
             funcname = getfuncname(param.name)
             funcsym = Symbol(funcname)
             func = getfield(Calmato, funcsym)
-            register(model, funcsym, 1, func, autodiff = true)
+            try
+                register(model, funcsym, 1, func, autodiff=true)
+            catch
+                @warn "Duplicated definition of $funcname in the database"
+            end
         end
     end
 
-    function G_phas(k::Int; k_param::Int = k, disordered::Bool = false)
+    function G_phas(k::Int; k_param::Int=k, disordered::Bool=false)
         Gs_param = JuMP.NonlinearExpression[]
         m = 0
         for param in phass[k_param].params
@@ -186,39 +215,42 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
             # Value of the parameter
             funcname = getfuncname(param.name)
             funcsym = Symbol(funcname)
-            @eval push!($Gs_param, @NLexpression($model, ($funcsym)($_T)))
+            @eval push!($Gs_param, @NLexpression($model, ($funcsym)($T)))
 
             # Solo constituents
             s_solo = findall(x -> length(x) == 1, comb)
             solo = [ (s, comb[s][1]) for s in s_solo ]
-            for (s,j) in solo
-                if length(constitution[k][s]) > 1
-                    Gs_param[m] = @NLexpression(model, Gs_param[m] * ( disordered ? x[k,j] : y[k,s,j] ))
-                end
+            for (s, j) in solo
+                Gs_param[m] = 
+                @NLexpression(model, Gs_param[m] * ( disordered ? x[k,j] : y[k,s,j] ))
             end
 
             # Paired constituents
             s_duo = findall(latt -> length(latt) == 2, comb)
             @assert length(s_duo) ≤ 1
-            if length(s_duo) == 1
-                s = s_duo[1]
-                i = comb[s][1]
-                j = comb[s][2]
-                Gs_param[m] = disordered ? @NLexpression(model, Gs_param[m] * x[k,i] * x[k,j]) :
-                                           @NLexpression(model, Gs_param[m] * y[k,s,i] * y[k,s,j])
-                for ν in 1:l 
-                    Gs_param[m] = disordered ? @NLexpression(model, Gs_param[m] * ( x[k,i] - x[k,j] )) :
-                                               @NLexpression(model, Gs_param[m] * ( y[k,s,i] - y[k,s,j] ))
-                end
+            length(s_duo) == 0 && continue
+            s = s_duo[1]
+            i = comb[s][1]
+            j = comb[s][2]
+            Gs_param[m] = disordered ? 
+            @NLexpression(model, Gs_param[m] * x[k,i] * x[k,j]) :
+            @NLexpression(model, Gs_param[m] * y[k,s,i] * y[k,s,j])
+            for ν in 1:l 
+                Gs_param[m] = disordered ? 
+                @NLexpression(model, Gs_param[m] * ( x[k,i] - x[k,j] )) :
+                @NLexpression(model, Gs_param[m] * ( y[k,s,i] - y[k,s,j] ))
             end
         end
 
-        if disordered
-            return @NLexpression(model, sum(Gs_param[i] for i in 1:m))
-        else
-            return @NLexpression(model, sum(Gs_param[i] for i in 1:m) + R*_T*sum( n[k,s] * xlogx( y[k,s,j] )
-                for s in 1:S, j in 1:J if j in constitution[k][s] && length(constitution[k][s]) > 1 ))
+        G = m > 1 ? @NLexpression(model, sum(Gs_param[i] for i in 1:m)) : Gs_param[1]
+
+        # Ideal entropy of configuration
+        nonzero = [(s,j) for s in 1:S, j in 1:J if j in constitution[k][s] && length(constitution[k][s]) > 1]
+        if !disordered && length(nonzero) > 1
+            G = @NLexpression(model, G + R*T*sum(n[k,s] * xlogx(y[k,s,j]) for (s,j) in nonzero))
         end
+
+        return G
     end
 
     # Gibbs energy contribution from each phase
@@ -228,16 +260,16 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
 
         k_do = disorder_id(db, phas)
         if k_do ≠ nothing # ordered phase
-            push!(Gs_phas, G_phas(k, k_param = k_do, disordered = true)) # disordered part
+            push!(Gs_phas, G_phas(k, k_param=k_do, disordered=true)) # disordered part
             # TODO: + 1.0 is an adhock and unphysical parameter of "penalty" on the ordered phase.
             @eval $Gs_phas[$k] = @NLexpression($model, $Gs_phas[$k] + $(G_phas(k)) + 1.0)
-            @eval $Gs_phas[$k] = @NLexpression($model, $Gs_phas[$k] - $(G_phas(k, disordered = true)))
+            @eval $Gs_phas[$k] = @NLexpression($model, $Gs_phas[$k] - $(G_phas(k, disordered=true)))
         else
             @eval push!($Gs_phas, $(G_phas(k)))
         end
     end
 
-    @NLobjective(model, Min, sum(Y[k]*Gs_phas[k] for k in 1:K))
+    @NLobjective(model, Min, sum(Y[k] * Gs_phas[k] for k in 1:K))
 
     @debug model
 
@@ -263,11 +295,22 @@ function disorder_id(db::Database, phas::Phase)
     return nothing
 end
 
-function init_system(db::Database; eps = 2e-8)
+function init_system(db::Database)
     elems = Vector{Element}()
     phass = Vector{Phase}()
 
     for ph in db.phass
+        if ph.state == 'G'
+            @warn "Gaseous phase is not supported yet. Exclude $(ph.name)."
+            continue
+        end
+        if any(latt -> "Va" in latt, ph.cons)
+            @warn "$(ph.name) includes vacancies. Exclude the phase."
+            continue
+        end
+        if any(latt -> any(spec -> length(stoichiometry(spec)) > 1, latt), ph.cons)
+            @warn "$(ph.name) includes molcular-like constituents. Calculation may be inaccurate."
+        end
         push!(phass, ph)
     end
 
@@ -276,12 +319,12 @@ function init_system(db::Database; eps = 2e-8)
         push!(elems, el)
     end
 
-    return init_system(db, elems, phass, eps = eps)
+    return init_system(db, elems, phass)
 end
 
 function equiatom(sys::System)
     N = length(sys.elems)
-    return fill(1//N, N)
+    return fill(1 // N, N)
 end
 
 function Base.display(sys::System)

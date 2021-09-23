@@ -14,7 +14,7 @@ function Base.display(res::EquilibResult)
     for k in 1:K
         phas = res.sys.phass[k]
         res.Y[k] < 1e-5 && continue
-        @printf "%s: %.4f mol\n" phas.name res.Y[k]
+        @printf "%s; %s: %.4f\n" phas.name constitutionstring(phas) res.Y[k] / sum(res.Y)
         for i in 1:I
             @printf "\t%s: %.4f\n" res.sys.elems[i].name res.x[k,i]
         end
@@ -22,7 +22,7 @@ function Base.display(res::EquilibResult)
         S = length(cons)
         S < 2 && continue
         for s in 1:S
-            phas.cons[s] == [] && continue
+            length(phas.cons[s]) < 2 && continue
             if length(filter(l -> l ≠ [], phas.cons)) > 1
                 println("\t" * constitutionstring(phas, s))
             end
@@ -53,8 +53,8 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15)
     end
 
     # Variables
-    _T = model[:_T] # temperature
-    _X = model[:_X] # molar amount of components
+    _T = model[:T] # temperature
+    _X = model[:X] # molar amount of components
     Y = model[:Y] # moalr amount of phases
     x = model[:x] # molar fraction of components in each phase
     y = model[:y] # site fraction in each sublattice
@@ -68,12 +68,14 @@ function equilib(sys::System, X = equiatom(sys), T = 298.15)
     set_lower_bound(_T, T)
     set_upper_bound(_T, T)
 
-    # Fix _X[i]
+    # Fix X[i]
+    # TODO: Using fix() results in X[i] = 0 for some reason
     for i in 1:I
-        fix(_X[i], X[i], force = true)
+        set_lower_bound(_X[i], X[i])
+        set_upper_bound(_X[i], X[i])
     end
 
-    # Set lower and lower bounds for variables
+    # Determine maximum values of Y[k]
     Y_max = [ sum( X[i] for i in 1:I ) / sum( n[k,s] for s in 1:S ) for k in 1:K ]
     for k in 1:K
         set_upper_bound(Y[k], Y_max[k])
