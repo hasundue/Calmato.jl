@@ -119,6 +119,7 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
         "verbosity" => 0,
         "output_iterations" => 1,
         "iteration_limit" => 3,
+        "cp_depth" => 0,
         "obbt_depth" => 0,
         "dbbt_tolerance" => eps,
         "absolute_constraint_feas_tolerance" => eps,
