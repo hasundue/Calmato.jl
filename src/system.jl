@@ -1,5 +1,6 @@
 struct System
     elems::Vector{Element}
+    conss::Vector{AbstractString}
     phass::Vector{Phase}
     nelem::Int # number of elements
     ncons::Int # number of constituents
@@ -273,7 +274,7 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
 
     @debug model
 
-    return System(elems, phass, I, J, K, S, n, temp, model)
+    return System(elems, conss, phass, I, J, K, S, n, temp, model)
 end
 
 function disorder_id(db::Database, phas::Phase)

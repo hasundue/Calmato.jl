@@ -8,29 +8,33 @@ struct EquilibResult
 end
 
 function Base.display(res::EquilibResult)
-    I = length(res.sys.elems)
-    K = length(res.sys.phass)
+    elems = res.sys.elems
+    conss = res.sys.conss
+    phass = res.sys.phass
+    I = length(elems)
+    J = length(conss)
+    K = length(phass)
     @assert size(res.x) == (K,I)
     for k in 1:K
-        phas = res.sys.phass[k]
+        phas = phass[k]
         res.Y[k] < 1e-5 && continue
         @printf "%s; %s: %.4f\n" phas.name constitutionstring(phas) res.Y[k] / sum(res.Y)
         !any(latt -> length(latt) > 1, phas.cons) && continue
         for i in 1:I
-            @printf "\t%s: %.4f\n" res.sys.elems[i].name res.x[k,i]
+            @printf "\t%s: %.4f\n" elems[i].name res.x[k,i]
         end
         cons = filter(latt -> !isempty(latt), phas.cons)
         S = length(cons)
-        S < 2 && continue
+        S < 2 && length(cons[1]) == length(elems) && continue
         for s in 1:S
             length(phas.cons[s]) < 2 && continue
             if length(filter(l -> l ≠ [], phas.cons)) > 1
                 println("\t" * constitutionstring(phas, s))
             end
-            for j in 1:I
-                consname = res.sys.elems[j].name
+            for j in 1:J
+                consname = conss[j]
                 if consname in cons[s]
-                    @printf "\t\t%s: %.4f\n" consname res.y[k,s,j]
+                    @printf "\t\t%s: %.4f\n" subscript(consname) res.y[k,s,j]
                 end
             end
         end
