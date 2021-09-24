@@ -15,6 +15,7 @@ function Base.display(res::EquilibResult)
         phas = res.sys.phass[k]
         res.Y[k] < 1e-5 && continue
         @printf "%s; %s: %.4f\n" phas.name constitutionstring(phas) res.Y[k] / sum(res.Y)
+        !any(latt -> length(latt) > 1, phas.cons) && continue
         for i in 1:I
             @printf "\t%s: %.4f\n" res.sys.elems[i].name res.x[k,i]
         end
