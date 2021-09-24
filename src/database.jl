@@ -414,7 +414,7 @@ function Base.print(db::Database)
             for i in 1:nlatt
             latt = param.comb[i]
                 for cons in latt
-                    print(cons)
+                    print(subscript(cons))
                     if cons ≠ latt[end]
                         print(',')
                     end
