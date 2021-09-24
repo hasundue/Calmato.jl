@@ -355,6 +355,7 @@ end
 
 function format_specie(str::AbstractString)
     # ex. str = "Cu2S1", "CU2O"
+    str = replace(str, r"(?<=\D)1(?=\D|$)" => "")
     replace(str, r"\D{1,2}(?=\d{1,}|$)" => format_element)
 end
 
