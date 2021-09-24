@@ -63,9 +63,9 @@ function constitutionstring(phas::Phase, s::Int)
     if length(cons[s]) > 1
         str *= '('
     end
-    for elname in cons[s]
-        str *= elname
-        if elname ≠ cons[s][end]
+    for spec in cons[s]
+        str *= subscript(spec)
+        if spec ≠ cons[s][end]
             str *= ','
         end
     end

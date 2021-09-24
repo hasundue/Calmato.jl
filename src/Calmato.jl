@@ -30,7 +30,16 @@ function McCormick.xlogx(d::T) where T <: ForwardDiff.Dual
 end
 
 function subscript(c::Char)
-    return Char(0x2080 + parse(Int, c))
+    i = tryparse(Int, string(c))
+    if isnothing(i)
+        return c
+    else
+        return Char(0x2080 + parse(Int, c))
+    end
+end
+
+function subscript(s::AbstractString)
+    return map(subscript, s)
 end
 
 function subscript(i::Int)
