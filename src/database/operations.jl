@@ -95,6 +95,10 @@ function Base.merge!(db_master::Database, db_source::Database,
             merge!(db_master.phass[km], db_source.phass[ks])
             push!(merged, ks)
         elseif typeof(arg) == Int
+            if arg < 0
+                push!(merged, -arg)
+                continue
+            end
             arg in merged && continue
             push!(db_master, db_source.phass[arg])
             push!(merged, arg)

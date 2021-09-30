@@ -13,7 +13,7 @@ using Test
     db2 = select(db2, "Cu S")
     print(db2)
 
-    db3 = merge(db1, db2, 2 => 1, 3 => 4, *)
+    db3 = merge(db1, db2, -1, 2 => 1, 3 => 4, *)
     print(db3)
     sys = init_system(db3)
     print(sys)
