@@ -100,26 +100,9 @@ function Base.print(db::Database)
     for k in 1:nphas
         phas = db.phass[k]
         print("\t\t$k: $(phas.name); ")
-        print(constitutionstring(phas))
-        print('\n')
+        println(constitutionstring(phas))
         for param in phas.params
-            print("\t\t\t$(param.symbol)")
-            print('(')
-            nlatt = length(param.comb)
-            for i in 1:nlatt
-            latt = param.comb[i]
-                for cons in latt
-                    print(subscript(cons))
-                    if cons ≠ latt[end]
-                        print(',')
-                    end
-                end
-                if i ≠ nlatt
-                    print(':')
-                end
-            end
-            print(";$(param.order)")
-            print(")\n")
+            println("\t\t\t" * localname(param))
         end
     end
 end

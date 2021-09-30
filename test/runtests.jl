@@ -2,19 +2,23 @@ using Calmato
 using Test
 
 @testset "Calmato.jl" begin
-    db = search_db("Cu Zn Liang Hsiao 2015")
-    print(db)
-    sys = init_system(db)
+    db1 = search_db("Cu Zn Liang Hsiao 2015")
+    print(db1)
+    sys = init_system(db1)
     print(sys)
     res = solidify(sys)
     print(res)
 
-    db = search_db("Cu H O S P Magnusson")
-    print(db)
-    db = select(db, "Cu S")
-    print(db)
-    sys = init_system(db)
+    db2 = search_db("Cu H O S P Magnusson")
+    db2 = select(db2, "Cu S")
+    print(db2)
+
+    db3 = merge(db1, db2, 2 => 1, 3 => 4, *)
+    print(db3)
+    sys = init_system(db3)
     print(sys)
-    res = equilib(sys, [0.99, 0.01], 900)
+    X = [0.7, 0.3, 0.01]
+    Ts = 600:100:1300
+    res = solidify(sys, X, Ts)
     print(res)
 end

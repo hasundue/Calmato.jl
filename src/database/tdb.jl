@@ -247,6 +247,25 @@ function getfuncname(str::AbstractString)
     filter(c -> !in(c, ['(', ')', ',', ':', ';']), str)
 end
 
+function localname(param::Parameter)
+    str = string(param.symbol)
+    str *= '('
+    S = length(param.comb)
+    for s in 1:S
+    latt = param.comb[s]
+        for cons in latt
+            str *= subscript(cons)
+            if cons ≠ latt[end]
+                str *= ','
+            end
+        end
+        if s ≠ S
+            str *= ':'
+        end
+    end
+    str *= ';' * string(param.order) * ')'
+end
+
 function format_constitution(str::AbstractString)
     # ex. str = "G(FCC,Cu:Cu,Zn,P;0)"
     replace(str, r"(?<=,|;|:).+?(?=,|;|:)" => format_specie)

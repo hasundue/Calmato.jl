@@ -17,7 +17,7 @@ import ZipFile
 
 MOI = MathOptInterface
 
-export read_tdb, search_db, select
+export read_tdb, search_db, select, merge, merge!
 export init_system
 export equilib
 export solidify
