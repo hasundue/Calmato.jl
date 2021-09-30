@@ -61,14 +61,21 @@ function search_db(str::AbstractString)
     end
 
     url = get(dicts[i], "tdburl", "")
-    zip = HTTP.download(url)
+    file = HTTP.download(url)
 
-    archive = ZipFile.Reader(zip)
-    @assert length(archive.files) == 1
-    file = archive.files[1]
-    db = read_tdb(file)
-    close(archive)
-    Base.Filesystem.rm(zip)
+    if endswith(file, ".zip")
+        archive = ZipFile.Reader(file)
+        @assert length(archive.files) == 1
+        io = archive.files[1]
+        db = read_tdb(io)
+        close(archive)
+    elseif endswith(file, ".tdb")
+        read_tdb(file)
+    else
+        @error "Unsupported filetype: $url"
+    end
+
+    Base.Filesystem.rm(file)
 
     return db
 end
