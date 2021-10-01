@@ -1,4 +1,4 @@
-function select(db::Database, elnames::Vector{<:AbstractString})
+function select(db::Database, elnames::Vector{<:AbstractString}, phasids::Vector{Int})
     elems = Element[]
     funcs = GFunction[]
     phass = Phase[]
@@ -8,8 +8,11 @@ function select(db::Database, elnames::Vector{<:AbstractString})
             push!(elems, elem)
         end
     end
-    for phas in db.phass
-        phas_selected = select(phas, elnames)
+
+    K = length(db.phass)
+    for k in 1:K
+        !in(k, phasids) && continue
+        phas_selected = select(db.phass[k], elnames)
         isnothing(phas_selected) && continue
         push!(phass, phas_selected)
     end
@@ -38,8 +41,30 @@ function select(db::Database, elnames::Vector{<:AbstractString})
     return Database(elems, funcs, phass, db.types)
 end
 
-function select(db::Database, elnames::AbstractString)
-    select(db, split(elnames))
+function select(db::Database, elnames::AbstractString = "*", args::Union{Int,Function}...)
+    if elnames == "*"
+        elnames = filter(e -> !in(e, ["/-", "Va"]), map(e -> e.name, db.elems))
+    else
+        elnames = split(elnames)
+    end
+    phasids = Int[]
+    exclude = Int[]
+    selectall = false
+    for arg in args
+        if arg == *
+            selectall = true
+            continue
+        elseif typeof(arg) == Int
+            arg > 0 ? push!(phasids, arg) : push!(exclude, -arg)
+        else
+            @error "Unsupported argument: $arg"
+        end
+    end
+    if selectall
+        K = length(db.phass)
+        phasids = vcat(phasids, [ k for k in 1:K if !in(k, exclude) ])
+    end
+    select(db, elnames, phasids)
 end
 
 function select(phas::Phase, elnames::Vector{<:AbstractString})

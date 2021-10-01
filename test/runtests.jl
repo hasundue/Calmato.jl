@@ -10,10 +10,10 @@ using Test
     print(res)
 
     db2 = search_db("Cu H O S P Magnusson")
-    db2 = select(db2, "Cu S")
+    db2 = select(db2, "Cu S", *, -1)
     print(db2)
 
-    db3 = merge(db1, db2, -1, 2 => 1, 3 => 4, *)
+    db3 = merge(db1, db2, 1 => 1, 2 => 4, *)
     print(db3)
     sys = init_system(db3)
     print(sys)
