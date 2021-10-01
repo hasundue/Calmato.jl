@@ -248,8 +248,7 @@ function getfuncname(str::AbstractString)
 end
 
 function localname(param::Parameter)
-    str = string(param.symbol)
-    str *= '('
+    str = ""
     S = length(param.comb)
     for s in 1:S
     latt = param.comb[s]
@@ -263,7 +262,7 @@ function localname(param::Parameter)
             str *= ':'
         end
     end
-    str *= ';' * string(param.order) * ')'
+    str *= ';' * string(param.order)
 end
 
 function format_constitution(str::AbstractString)

@@ -164,7 +164,7 @@ function Base.merge!(phas_master::Phase, phas_source::Phase)
     for param in phas_source.params
         name = localname(param)
         if name in paramnames_master
-            @info "$name already exists in $(phas_master.name)"
+            @info "$(param.symbol)($name) already exists in $(phas_master.name)"
             continue
         end
         push!(phas_master.params, param)

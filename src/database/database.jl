@@ -102,7 +102,7 @@ function Base.print(db::Database)
         print("\t\t$k: $(phas.name); ")
         println(constitutionstring(phas))
         for param in phas.params
-            println("\t\t\t" * localname(param))
+            println("\t\t\t" * param.symbol * '(' * localname(param) * ')')
         end
     end
 end
