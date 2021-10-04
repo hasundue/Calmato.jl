@@ -18,6 +18,7 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     # Evaluate parsed CALPHAD functions and define them as Julia functions and
     # determine minimum and maximum temperature simultaneously.
     for func in db.funcs
+        func.name == "R" && continue
         eval(Meta.parse(func.funcstr))
     end
     Tl, Tu = -Inf, Inf
@@ -282,7 +283,7 @@ function disorder_id(db::Database, phas::Phase)
     code = phas.type
     for char in code
         i = findfirst(type -> type.code == char, db.types)
-        @assert i ≠ nothing
+        isnothing(i) && continue
         tdef = db.types[i]
         args = split(tdef.args)
         length(args) < 3 && continue
