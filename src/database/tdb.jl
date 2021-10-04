@@ -86,6 +86,8 @@ end
 function julialize_funcstr!(arg::AbstractGFunction, funcs::Vector{GFunction})
     for pair in ["T*LN(T)" => "xlogx(T)",
                  "LN(" => "log(",
+                 "T*ln(T)" => "xlogx(T)",
+                 "ln(" => "log(",
                  "**" => "^",
                  ".+" => ".0+",
                  ".-" => ".0-",
