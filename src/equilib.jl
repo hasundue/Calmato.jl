@@ -35,6 +35,7 @@ function Base.display(res::EquilibResult)
             for j in 1:J
                 consname = conss[j]
                 if consname in cons[s]
+                    res.y[k,s,j] < 1e-4 && continue
                     @printf "\t\t%s: %.4f\n" subscript(consname) res.y[k,s,j]
                 end
             end
