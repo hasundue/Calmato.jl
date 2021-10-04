@@ -5,6 +5,7 @@ const keywordlist = [
     "TYPE_DEFINITION",
     "PHASE",
     "CONSTITUENT",
+    "CONST",
     "PARAMETER",
 ]
 
@@ -16,13 +17,13 @@ function read_tdb(io::IO)
 
     # Parse each elements
     while !eof(io)
-        block = readline(io)
+        block = readline(io, keep = true)
 
         block = replace(block, '\t' => "") # remove tabs
 
         isempty(block) && continue # blank line
         !occursin(r"\S+", block) && continue # blank line
-        occursin(r"^\$", block) && continue # comment line
+        occursin(r"\$", block) && continue # comment line
 
         i = findfirst('!', block)
         if isnothing(i)
@@ -31,6 +32,8 @@ function read_tdb(io::IO)
             block = block[1:i-1] # remove '!'
         end
 
+        block = replace(block, '\r' => "")
+        block = replace(block, '\n' => ' ')
         strs = split(block)
         isempty(strs) && continue
 
@@ -50,13 +53,14 @@ function read_tdb(io::IO)
             elseif keyword == "PHASE"
                 phas = parse_phase(block)
                 push!(phass, phas)
-            elseif keyword == "CONSTITUENT"
+            elseif keyword in ["CONSTITUENT", "CONST"]
                 phasname, cons = parse_constituent(block)
                 phas = filter(phas -> uppercase(phas.name) == uppercase(phasname), phass)
                 @assert length(phas) == 1
                 phas[1].cons = cons
             elseif keyword == "PARAMETER"
                 phasname, param = parse_parameter(block)
+                isnothing(param) && continue
                 phas = filter(phas -> uppercase(phas.name) == uppercase(phasname), phass)
                 @assert length(phas) == 1
                 push!(phas[1].params, param)
@@ -184,12 +188,12 @@ function parse_phase(text::AbstractString)
     strs = split(text)
     @assert match(r"PHASE"i, strs[1]) ≠ ""
     model = strs[3] # "%", "%&", "%Q+", etc.
-    N = parse(Int, strs[4])
-    sites = tryparse.(Int, strs[5:end])
+    K = parse(Int, strs[4])
+    i = 5 + K - 1
+    sites = tryparse.(Int, strs[5:i])
     if nothing in sites
-        sites = parse.(Float64, strs[5:end])
+        sites = parse.(Float64, strs[5:i])
     end
-    @assert length(sites) == N
     text = replace(strs[2], " " => "")
     strs = split(text, ':')
     @assert length(strs) ≤ 2
@@ -222,7 +226,13 @@ function parse_parameter(text::AbstractString)
     name = replace(text[1:l], " " => "") # G(BCC_B2,Cu:Cu,Zn;0)
     name = format_constitution(name)
     funcname = getfuncname(name) # GBCC_B2CuCuZn0
-    symbol = name[1] # G
+    symbol = split(name, '(')[1] # G
+
+    # Skip MatCalc specific parameters
+    symbol == "HMVA" && return nothing, nothing
+    symbol == "SE" && return nothing, nothing
+
+    symbol = symbol[1]
 
     strs = split(text[l+1:end]) # 298.15...
 
