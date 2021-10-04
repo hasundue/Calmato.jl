@@ -17,11 +17,11 @@ function Base.display(res::EquilibResult)
     @assert size(res.x) == (K,I)
     for k in 1:K
         phas = phass[k]
-        res.Y[k] < 1e-5 && continue
+        res.Y[k] < 1e-4 && continue
         @printf "%s; %s: %.4f\n" phas.name constitutionstring(phas) res.Y[k] / sum(res.Y)
         !any(latt -> length(latt) > 1, phas.cons) && continue
         for i in 1:I
-            res.x[k,i] < 1e-5 && continue
+            res.x[k,i] < 1e-4 && continue
             @printf "\t%s: %.4f\n" elems[i].name res.x[k,i]
         end
         cons = filter(latt -> !isempty(latt), phas.cons)
