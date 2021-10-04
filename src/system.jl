@@ -209,6 +209,8 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
         Gs_param = JuMP.NonlinearExpression[]
         m = 0
         for param in phass[k_param].params
+            !in(param.symbol, ['G', 'L']) && continue
+
             m += 1
             l = param.order
 
