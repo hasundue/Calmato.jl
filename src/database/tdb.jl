@@ -7,6 +7,7 @@ const keywordlist = [
     "CONSTITUENT",
     "CONST",
     "PARAMETER",
+    "PAR",
 ]
 
 function read_tdb(io::IO)
@@ -58,7 +59,7 @@ function read_tdb(io::IO)
                 phas = filter(phas -> uppercase(phas.name) == uppercase(phasname), phass)
                 @assert length(phas) == 1
                 phas[1].cons = cons
-            elseif keyword == "PARAMETER"
+            elseif keyword in ["PARAMETER", "PAR"]
                 phasname, param = parse_parameter(block)
                 isnothing(param) && continue
                 phas = filter(phas -> uppercase(phas.name) == uppercase(phasname), phass)
@@ -219,7 +220,7 @@ end
 function parse_parameter(text::AbstractString)
     # Parameters
     strs = split(text)
-    @assert match(r"PARAMETER"i, strs[1]) ≠ ""
+    @assert match(r"PAR"i, strs[1]) ≠ ""
 
     text = join(strs[2:end], ' ') # ex. G(BCC2,...
 
