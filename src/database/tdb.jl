@@ -89,6 +89,7 @@ function julialize_funcstr!(arg::AbstractGFunction, funcs::Vector{GFunction})
                  "LN(" => "log(",
                  "T*ln(T)" => "xlogx(T)",
                  "ln(" => "log(",
+                 "TlnT" => "xlogx(T)",
                  "**" => "^",
                  ".+" => ".0+",
                  ".-" => ".0-",

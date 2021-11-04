@@ -8,10 +8,32 @@ end
 
 abstract type AbstractGFunction end
 
-mutable struct GFunction{T<:Real} <: AbstractGFunction
+mutable struct GFunction <: AbstractGFunction
     name::AbstractString
-    temp::Tuple{T,T}
+    temp::Tuple{<:Real,<:Real}
+    temps::Vector{<:Real}
+    exprs::Vector{AbstractString}
     funcstr::AbstractString
+
+    function GFunction(name::AbstractString,
+                       temp::Tuple{Real,Real},
+                       funcstr::AbstractString)
+        func = new()
+        func.name = name
+        func.temp = temp
+        func.funcstr = funcstr
+        return func
+    end
+
+    function GFunction(name::AbstractString,
+                       temps::Vector{Real},
+                       exprs::Vector{AbstractString})
+        func = new()
+        func.name = name
+        func.temps = temps
+        func.exprs = exprs
+        return func
+    end
 end
 
 const Sublattice = Vector{AbstractString}
@@ -42,6 +64,17 @@ mutable struct Phase
                    params::Vector{Parameter})
         return new(name, state, type, sites, cons, params)
     end
+
+    function Phase(name::AbstractString,
+                   state::Char,
+                   sites::Vector{Real},
+                   cons::Constitution,
+                   parmas::Vector{Parameter})
+        phas = new()
+        for field in [:name, :state, :sites, :cons, :params]
+            setfield!(phas, field, getfield(Main, field))
+        end
+        return phas
 
     function Phase(name::AbstractString,
                    state::Char,
