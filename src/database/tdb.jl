@@ -248,13 +248,17 @@ function parse_parameter(text::AbstractString)
 
     text = text[k+1:end] # Cu:Cu,Zn;0
     comb_text, order_text = split(text, ';') # Cu:Cu,Zn, 0
-    comb_strs = split(comb_text, ':') # ["Cu", "Cu,Zn"]
-    comb = map(text -> split(text, ','), comb_strs) # [[Cu], [Cu,Zn]]
+    comb = parse_combination(comb_text)
     order = parse(Int, order_text)
 
     temp, funcstr = parse_function(funcname, strs)
 
     return phas, Parameter(name, symbol, comb, order, temp, funcstr)
+end
+
+function parse_combination(str::AbstractString)
+    comb_strs = split(str, ':') # ["Cu", "Cu,Zn"]
+    comb = map(text -> split(text, ','), comb_strs) # [[Cu], [Cu,Zn]]
 end
 
 function getfuncname(str::AbstractString)

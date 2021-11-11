@@ -12,7 +12,6 @@ function read_db(toml::AbstractString)
         elem = Element(name, refstate, mass, H298, S298)
         push!(elems, elem)
     end
-    println(elems)
 
     funcs = GFunction[]
     dicts = get(dict_db, "function", Dict())
@@ -41,16 +40,42 @@ function read_db(toml::AbstractString)
         end
         push!(funcs, func)
     end
-    println(funcs)
 
     phass = Phase[]
-    dicts = get(dict_db, "phase", Dict())
+    dicts = get(dict_db, "phase", Dict[])
     for dict in dicts
-        name = get(dict, "formula", "")
+        name = get(dict, "name", "")
         state = get(dict, "state", "")[1]
-        rms = collect(eachmatch())
-    end
-end
 
-function parse_function_yaml(str::AbstractString)
+        str = get(dict, "constitution", "")
+        rms = collect(eachmatch(r"\(([^\(\)]*)\)(\d{0,})", str))
+        caps = map(rm -> rm.captures, rms)
+        sites = [ cap[2] == "" ? 1 : parse(Int, cap[2]) for cap in caps ]
+        cons = [ split(cap[1], ",") for cap in caps ]
+
+        params = Parameter[]
+        params_dict = get(dict, "param", Dict[])
+        for dict in params_dict
+            form = get(dict, "formula", "")
+            symbol = form[1]
+
+            str = split(form[3:end-1], ';') # Cu,Zn:Zn;0
+            comb = parse_combination(str[1])
+            order = parse(Int, str[2])
+
+            tmin = get(dict, "tmin", -Inf)
+            tmax = get(dict, "tmax", Inf)
+            temp = (tmin, tmax)
+
+            expr = get(dict, "expr", "")
+
+            param = Parameter(form, symbol, comb, order, temp, expr)
+            push!(params, param)
+        end
+
+        phas = Phase(name, state, sites, cons, params)
+        push!(phass, phas)
+    end
+
+    return Database(elems, funcs, phass)
 end
