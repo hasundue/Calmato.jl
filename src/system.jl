@@ -17,12 +17,14 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
 
     # Evaluate parsed CALPHAD functions and define them as Julia functions and
     # determine minimum and maximum temperature simultaneously.
+    Tl, Tu = -Inf, Inf
     for func in db.funcs
         func.name == "R" && continue
         julialize!(func, db.funcs)
         eval(Meta.parse(func.funcstr))
+        Tl = func.temp[1] > Tl ? func.temp[1] : Tl
+        Tu = func.temp[2] < Tu ? func.temp[2] : Tu
     end
-    Tl, Tu = -Inf, Inf
     for phas in phass
         for param in phas.params
             julialize!(param, vcat(db.funcs, phas.params))
@@ -283,6 +285,33 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     return System(elems, conss, phass, I, J, K, S, n, temp, model)
 end
 
+function init_system(db::Database)
+    elems = Vector{Element}()
+    phass = Vector{Phase}()
+
+    for ph in db.phass
+        if ph.state == 'G'
+            @warn "Gaseous phase is not supported yet. Exclude $(ph.name)."
+            continue
+        end
+        if any(latt -> "Va" in latt, ph.cons)
+            @warn "$(ph.name) includes vacancies. Exclude the phase."
+            continue
+        end
+        if any(latt -> any(spec -> length(stoichiometry(spec)) > 1, latt), ph.cons)
+            @warn "$(ph.name) includes molcular-like constituents. Calculation may be inaccurate."
+        end
+        push!(phass, ph)
+    end
+
+    for el in db.elems
+        el.name in ["/-", "Va"] && continue
+        push!(elems, el)
+    end
+
+    return init_system(db, elems, phass)
+end
+
 function julialize!(arg::AbstractGFunction, funcs::Vector{<:AbstractGFunction})
     if isempty(arg.funcstr) # toml database
         @assert !isempty(arg.temps)
@@ -339,33 +368,6 @@ function disorder_id(db::Database, phas::Phase)
         end
     end
     return nothing
-end
-
-function init_system(db::Database)
-    elems = Vector{Element}()
-    phass = Vector{Phase}()
-
-    for ph in db.phass
-        if ph.state == 'G'
-            @warn "Gaseous phase is not supported yet. Exclude $(ph.name)."
-            continue
-        end
-        if any(latt -> "Va" in latt, ph.cons)
-            @warn "$(ph.name) includes vacancies. Exclude the phase."
-            continue
-        end
-        if any(latt -> any(spec -> length(stoichiometry(spec)) > 1, latt), ph.cons)
-            @warn "$(ph.name) includes molcular-like constituents. Calculation may be inaccurate."
-        end
-        push!(phass, ph)
-    end
-
-    for el in db.elems
-        el.name in ["/-", "Va"] && continue
-        push!(elems, el)
-    end
-
-    return init_system(db, elems, phass)
 end
 
 function equiatom(sys::System)
