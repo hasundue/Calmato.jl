@@ -17,22 +17,23 @@ function read_db(toml::AbstractString)
     dicts = get(dict_db, "function", Dict())
     for dict in dicts
         name = get(dict, "name", "")
-        expr = get(dict, "expr", nothing)
-        if typeof(expr) <: AbstractString
+        expr_union = get(dict, "expr", nothing)
+        if typeof(expr_union) <: AbstractString
             tmin = get(dict, "tmin", -Inf)
             tmax = get(dict, "tmax", Inf)
-            temp = (tmin, tmax)
-            func = GFunction(name, temp, expr)
-        elseif typeof(expr) <: Vector
+            temps = [tmin, tmax]
+            func = GFunction(name, temps, [expr_union])
+        elseif typeof(expr_union) <: Vector
             temps = Real[]
             exprs = AbstractString[]
-            for ex in expr
-                tmin = get(ex, "tmin", -Inf)
+            for expr_dict in expr_union
+                tmin = get(expr_dict, "tmin", -Inf)
                 push!(temps, tmin)
-                str = get(ex, "expr", "")
+
+                str = get(expr_dict, "expr", "")
                 push!(exprs, str)
             end
-            tmax = get(expr[end], "tmax", Inf)
+            tmax = get(expr_union[end], "tmax", Inf)
             push!(temps, tmax)
             func = GFunction(name, temps, exprs)
         else
@@ -44,7 +45,7 @@ function read_db(toml::AbstractString)
     phass = Phase[]
     dicts = get(dict_db, "phase", Dict[])
     for dict in dicts
-        name = get(dict, "name", "")
+        phasname = get(dict, "name", "")
         state = get(dict, "state", "")[1]
 
         str = get(dict, "constitution", "")
@@ -57,6 +58,13 @@ function read_db(toml::AbstractString)
         params_dict = get(dict, "param", Dict[])
         for dict in params_dict
             form = get(dict, "formula", "")
+
+            funcname = getfuncname(form)
+            name = ""
+            name *= funcname[1]
+            name *= phasname
+            name *= funcname[2:end]
+
             symbol = form[1]
 
             str = split(form[3:end-1], ';') # Cu,Zn:Zn;0
@@ -65,15 +73,15 @@ function read_db(toml::AbstractString)
 
             tmin = get(dict, "tmin", -Inf)
             tmax = get(dict, "tmax", Inf)
-            temp = (tmin, tmax)
+            temps = [tmin, tmax]
 
             expr = get(dict, "expr", "")
 
-            param = Parameter(form, symbol, comb, order, temp, expr)
+            param = Parameter(form, symbol, comb, order, temps, [expr], name)
             push!(params, param)
         end
 
-        phas = Phase(name, state, sites, cons, params)
+        phas = Phase(phasname, state, sites, cons, params)
         push!(phass, phas)
     end
 
