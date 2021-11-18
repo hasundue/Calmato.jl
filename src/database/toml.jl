@@ -68,8 +68,9 @@ function read_db(toml::AbstractString)
             symbol = form[1]
 
             str = split(form[3:end-1], ';') # Cu,Zn:Zn;0
+            @assert length(str) ≤ 2
             comb = parse_combination(str[1])
-            order = parse(Int, str[2])
+            order = length(str) == 1 ? 0 : parse(Int, str[2])
 
             tmin = get(dict, "tmin", -Inf)
             tmax = get(dict, "tmax", Inf)
