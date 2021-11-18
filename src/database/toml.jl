@@ -57,7 +57,7 @@ function read_db(toml::AbstractString)
         params = Parameter[]
         params_dict = get(dict, "param", Dict[])
         for dict in params_dict
-            form = get(dict, "formula", "")
+            form = get(dict, "form", "")
 
             funcname = getfuncname(form)
             name = ""
