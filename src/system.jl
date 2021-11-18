@@ -295,8 +295,7 @@ function init_system(db::Database)
             continue
         end
         if any(latt -> "Va" in latt, ph.cons)
-            @warn "$(ph.name) includes vacancies. Exclude the phase."
-            continue
+            @warn "$(ph.name) includes vacancies. Calculation may be inaccurate."
         end
         if any(latt -> any(spec -> length(stoichiometry(spec)) > 1, latt), ph.cons)
             @warn "$(ph.name) includes molcular-like constituents. Calculation may be inaccurate."
