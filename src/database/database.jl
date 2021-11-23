@@ -61,9 +61,10 @@ function Parameter(name::AbstractString,
                    comb::Vector{<:Vector},
                    order::Int,
                    temp::Tuple{<:Real,<:Real},
+                   funcname::AbstractString,
                    funcstr::AbstractString)
     return Parameter(name, symbol, comb, order, temp,
-                     Real[], AbstractString[], getfuncname(name), funcstr)
+                     Real[], AbstractString[], funcname, funcstr)
 end
 
 mutable struct Phase

@@ -200,12 +200,16 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
         for param in phas.params
             funcname = param.funcname
             funcsym = Symbol(funcname)
-            func = getfield(Calmato, funcsym)
-            try
+            # try
+                func = getfield(Calmato, funcsym)
+            # catch
+            #     error(phas.name * param.name * funcname)
+            # end
+            # try
                 register(model, funcsym, 1, func, autodiff=true)
-            catch
-                @warn "Duplicated definition of $funcname in the database"
-            end
+            # catch
+            #     @warn "Duplicated definition of $funcname in the database"
+            # end
         end
     end
 
@@ -298,7 +302,7 @@ function init_system(db::Database)
             @warn "$(ph.name) includes vacancies. Calculation may be inaccurate."
         end
         if any(latt -> any(spec -> length(stoichiometry(spec)) > 1, latt), ph.cons)
-            @warn "$(ph.name) includes molcular-like constituents. Calculation may be inaccurate."
+            @warn "$(ph.name) includes molecular-like constituents. Calculation may be inaccurate."
         end
         push!(phass, ph)
     end
@@ -327,7 +331,7 @@ function julialize!(arg::AbstractGFunction, funcs::Vector{<:AbstractGFunction})
         arg.funcstr *= "\tend\nend\n"
 
         for func in funcs
-            arg.funcstr = replace(arg.funcstr, func.name => func.funcname * "(T)")
+            arg.funcstr = replace(arg.funcstr, func.name => func.funcname)
         end
     end
 
@@ -345,8 +349,8 @@ function julialize!(arg::AbstractGFunction, funcs::Vector{<:AbstractGFunction})
     end
     for func in funcs
         func.name == arg.name && continue
-        reg = Regex(func.name * "(?=\\W)")
-        arg.funcstr = replace(arg.funcstr, reg => "$(func.name)(T)")
+        reg = Regex(func.name * "(\\(T\\)){0,}(?=\\W)")
+        arg.funcstr = replace(arg.funcstr, reg => "$(func.funcname)(T)")
     end
 end
 

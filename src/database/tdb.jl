@@ -217,13 +217,14 @@ function parse_parameter(text::AbstractString)
     phas = replace(text[1:k-1], " " => "") # BCC_B2
 
     text = text[k+1:end] # Cu:Cu,Zn;0
+    name = symbol * '(' * text * ')'
     comb_text, order_text = split(text, ';') # Cu:Cu,Zn, 0
     comb = parse_combination(comb_text)
     order = parse(Int, order_text)
 
     temp, funcstr = parse_function(funcname, strs)
 
-    return phas, Parameter(name, symbol, comb, order, temp, funcstr)
+    return phas, Parameter(name, symbol, comb, order, temp, funcname, funcstr)
 end
 
 function parse_combination(str::AbstractString)
@@ -251,6 +252,10 @@ function localname(param::Parameter)
         end
     end
     str *= ';' * string(param.order)
+end
+
+function localname(func::GFunction)
+    return func.name
 end
 
 function format_constitution(str::AbstractString)

@@ -82,6 +82,9 @@ function select(phas::Phase, elnames::Vector{<:AbstractString})
                                     comb,
                                     param.order,
                                     param.temp,
+                                    param.temps,
+                                    param.exprs,
+                                    param.funcname,
                                     param.funcstr))
         end
     end
