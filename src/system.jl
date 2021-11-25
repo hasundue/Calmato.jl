@@ -348,8 +348,9 @@ function julialize!(arg::AbstractGFunction, funcs::Vector{<:AbstractGFunction})
         arg.funcstr = replace(arg.funcstr, pair)
     end
     for func in funcs
+        func.name == "R" && continue
         func.name == arg.name && continue
-        reg = Regex(func.name * "(\\(T\\)){0,}(?=\\W)")
+        reg = Regex(func.funcname * "(\\(T\\)){0,}(?=\\W)")
         arg.funcstr = replace(arg.funcstr, reg => "$(func.funcname)(T)")
     end
 end
