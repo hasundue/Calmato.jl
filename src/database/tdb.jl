@@ -71,36 +71,7 @@ function read_tdb(io::IO)
         end
     end
 
-    # "Julialize" the functions
-    for func in funcs
-        julialize_funcstr!(func, funcs)
-    end
-    for phas in phass
-        for param in phas.params
-            julialize_funcstr!(param, funcs)
-        end
-    end
-
     return Database(elems, funcs, phass, types)
-end
-
-function julialize_funcstr!(arg::AbstractGFunction, funcs::Vector{GFunction})
-    for pair in ["T*LN(T)" => "xlogx(T)",
-                 "LN(" => "log(",
-                 "T*ln(T)" => "xlogx(T)",
-                 "ln(" => "log(",
-                 "**" => "^",
-                 ".+" => ".0+",
-                 ".-" => ".0-",
-                 ".*" => ".0*",
-                 "./" => ".0/"]
-        arg.funcstr = replace(arg.funcstr, pair)
-    end
-    for func in funcs
-        func.name == arg.name && continue
-        reg = Regex(func.name * "(?=\\W)")
-        arg.funcstr = replace(arg.funcstr, reg => "$(func.name)(T)")
-    end
 end
 
 function read_tdb(tdb::AbstractString)
@@ -246,14 +217,19 @@ function parse_parameter(text::AbstractString)
     phas = replace(text[1:k-1], " " => "") # BCC_B2
 
     text = text[k+1:end] # Cu:Cu,Zn;0
+    name = symbol * '(' * text * ')'
     comb_text, order_text = split(text, ';') # Cu:Cu,Zn, 0
-    comb_strs = split(comb_text, ':') # ["Cu", "Cu,Zn"]
-    comb = map(text -> split(text, ','), comb_strs) # [[Cu], [Cu,Zn]]
+    comb = parse_combination(comb_text)
     order = parse(Int, order_text)
 
     temp, funcstr = parse_function(funcname, strs)
 
-    return phas, Parameter(name, symbol, comb, order, temp, funcstr)
+    return phas, Parameter(name, symbol, comb, order, temp, funcname, funcstr)
+end
+
+function parse_combination(str::AbstractString)
+    comb_strs = split(str, ':') # ["Cu", "Cu,Zn"]
+    comb = map(text -> split(text, ','), comb_strs) # [[Cu], [Cu,Zn]]
 end
 
 function getfuncname(str::AbstractString)
@@ -276,6 +252,10 @@ function localname(param::Parameter)
         end
     end
     str *= ';' * string(param.order)
+end
+
+function localname(func::GFunction)
+    return func.name
 end
 
 function format_constitution(str::AbstractString)

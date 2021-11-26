@@ -8,10 +8,26 @@ end
 
 abstract type AbstractGFunction end
 
-mutable struct GFunction{T<:Real} <: AbstractGFunction
+mutable struct GFunction <: AbstractGFunction
     name::AbstractString
-    temp::Tuple{T,T}
+    temp::Tuple{<:Real,<:Real}
+    temps::Vector{<:Real}
+    exprs::Vector{AbstractString}
+    funcname::AbstractString
     funcstr::AbstractString
+end
+
+function GFunction(name::AbstractString,
+                   temp::Tuple{<:Real,<:Real},
+                   funcstr::AbstractString)
+    return GFunction(name, temp, Real[], AbstractString[], getfuncname(name), funcstr)
+end
+
+function GFunction(name::AbstractString,
+                   temps::Vector{<:Real},
+                   exprs::Vector{<:AbstractString})
+    temp = (minimum(temps), maximum(temps))
+    return GFunction(name, temp, temps, exprs, getfuncname(name), "")
 end
 
 const Sublattice = Vector{AbstractString}
@@ -23,7 +39,32 @@ mutable struct Parameter <: AbstractGFunction
     comb::Constitution
     order::Int
     temp::Tuple{<:Real,<:Real}
+    temps::Vector{<:Real}
+    exprs::Vector{AbstractString}
+    funcname::AbstractString
     funcstr::AbstractString
+end
+
+function Parameter(name::AbstractString,
+                   symbol::Char,
+                   comb::Vector{<:Vector},
+                   order::Int,
+                   temps::Vector{<:Real},
+                   exprs::Vector{<:AbstractString},
+                   funcname::AbstractString)
+    temp = (minimum(temps), maximum(temps))
+    return Parameter(name, symbol, comb, order, temp, temps, exprs, funcname, "")
+end
+
+function Parameter(name::AbstractString,
+                   symbol::Char,
+                   comb::Vector{<:Vector},
+                   order::Int,
+                   temp::Tuple{<:Real,<:Real},
+                   funcname::AbstractString,
+                   funcstr::AbstractString)
+    return Parameter(name, symbol, comb, order, temp,
+                     Real[], AbstractString[], funcname, funcstr)
 end
 
 mutable struct Phase
@@ -33,28 +74,27 @@ mutable struct Phase
     sites::Vector{<:Real}
     cons::Constitution
     params::Vector{Parameter}
+end
 
-    function Phase(name::AbstractString,
-                   state::Char,
-                   type::AbstractString,
-                   sites::Vector{<:Real},
-                   cons::Constitution,
-                   params::Vector{Parameter})
-        return new(name, state, type, sites, cons, params)
-    end
+function Phase(name::AbstractString,
+               state::Char,
+               sites::Vector{<:Real})
+    return Phase(name, state, "%", sites, Sublattice[], Parameter[])
+end
 
-    function Phase(name::AbstractString,
-                   state::Char,
-                   type::AbstractString,
-                   sites::Vector{<:Real})
-        phas = new()
-        phas.name = name
-        phas.state = state
-        phas.type = type
-        phas.sites = sites
-        phas.params = Parameter[]
-        return phas
-    end
+function Phase(name::AbstractString,
+               state::Char,
+               sites::Vector{<:Real},
+               cons::Vector{<:Vector},
+               params::Vector{Parameter})
+    return Phase(name, state, "%", sites, cons, params)
+end
+
+function Phase(name::AbstractString,
+               state::Char,
+               type::AbstractString,
+               sites::Vector{<:Real})
+    phas = Phase(name, state, type, sites, Sublattice[], Parameter[])
 end
 
 struct TypeDefinition
@@ -68,6 +108,12 @@ struct Database
     funcs::Vector{GFunction}
     phass::Vector{Phase}
     types::Vector{TypeDefinition}
+end
+
+function Database(elems::Vector{Element},
+                  funcs::Vector{GFunction},
+                  phass::Vector{Phase})
+    return Database(elems, funcs, phass, TypeDefinition[])
 end
 
 function Base.display(db::Database)

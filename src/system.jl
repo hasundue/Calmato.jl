@@ -17,13 +17,17 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
 
     # Evaluate parsed CALPHAD functions and define them as Julia functions and
     # determine minimum and maximum temperature simultaneously.
+    Tl, Tu = -Inf, Inf
     for func in db.funcs
         func.name == "R" && continue
+        julialize!(func, db.funcs)
         eval(Meta.parse(func.funcstr))
+        Tl = func.temp[1] > Tl ? func.temp[1] : Tl
+        Tu = func.temp[2] < Tu ? func.temp[2] : Tu
     end
-    Tl, Tu = -Inf, Inf
     for phas in phass
         for param in phas.params
+            julialize!(param, vcat(db.funcs, phas.params))
             eval(Meta.parse(param.funcstr))
             Tl = param.temp[1] > Tl ? param.temp[1] : Tl
             Tu = param.temp[2] < Tu ? param.temp[2] : Tu
@@ -194,14 +198,18 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     # Register all the functions for parameters
     for phas in phass
         for param in phas.params
-            funcname = getfuncname(param.name)
+            funcname = param.funcname
             funcsym = Symbol(funcname)
-            func = getfield(Calmato, funcsym)
-            try
+            # try
+                func = getfield(Calmato, funcsym)
+            # catch
+            #     error(phas.name * param.name * funcname)
+            # end
+            # try
                 register(model, funcsym, 1, func, autodiff=true)
-            catch
-                @warn "Duplicated definition of $funcname in the database"
-            end
+            # catch
+            #     @warn "Duplicated definition of $funcname in the database"
+            # end
         end
     end
 
@@ -218,7 +226,7 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
             comb = map.(name -> get(cons_ids, name, 0), param.comb)
 
             # Value of the parameter
-            funcname = getfuncname(param.name)
+            funcname = param.funcname
             funcsym = Symbol(funcname)
             @eval push!($Gs_param, @NLexpression($model, ($funcsym)($T)))
 
@@ -281,6 +289,72 @@ function init_system(db::Database, elems::Vector{Element}, phass::Vector{<:Phase
     return System(elems, conss, phass, I, J, K, S, n, temp, model)
 end
 
+function init_system(db::Database)
+    elems = Vector{Element}()
+    phass = Vector{Phase}()
+
+    for ph in db.phass
+        if ph.state == 'G'
+            @warn "Gaseous phase is not supported yet. Exclude $(ph.name)."
+            continue
+        end
+        if any(latt -> "Va" in latt, ph.cons)
+            @warn "$(ph.name) includes vacancies. Calculation may be inaccurate."
+        end
+        if any(latt -> any(spec -> length(stoichiometry(spec)) > 1, latt), ph.cons)
+            @warn "$(ph.name) includes molecular-like constituents. Calculation may be inaccurate."
+        end
+        push!(phass, ph)
+    end
+
+    for el in db.elems
+        el.name in ["/-", "Va"] && continue
+        push!(elems, el)
+    end
+
+    return init_system(db, elems, phass)
+end
+
+function julialize!(arg::AbstractGFunction, funcs::Vector{<:AbstractGFunction})
+    if isempty(arg.funcstr) # toml database
+        @assert !isempty(arg.temps)
+        @assert !isempty(arg.exprs)
+
+        arg.funcstr *= "function $(arg.funcname)(T)::typeof(T)\n"
+        N = length(arg.exprs)
+        for i in 1:N
+            expr = arg.exprs[i]
+            arg.funcstr *= i == 1 ? "\tif " : "\telseif "
+            arg.funcstr *= "$(arg.temps[i]) ≤ T ≤ $(arg.temps[i+1])\n"
+            arg.funcstr *= "\t\t" * expr * "\n"
+        end
+        arg.funcstr *= "\tend\nend\n"
+
+        for func in funcs
+            arg.funcstr = replace(arg.funcstr, func.name => func.funcname)
+        end
+    end
+
+    for pair in ["T*LN(T)" => "xlogx(T)",
+                 "LN(" => "log(",
+                 "T*ln(T)" => "xlogx(T)",
+                 "ln(" => "log(",
+                 "TlnT" => "xlogx(T)",
+                 "**" => "^",
+                 ".+" => ".0+",
+                 ".-" => ".0-",
+                 ".*" => ".0*",
+                 "./" => ".0/"]
+        arg.funcstr = replace(arg.funcstr, pair)
+    end
+    for func in funcs
+        func.name == "R" && continue
+        func.name == arg.name && continue
+        reg = Regex(func.funcname * "(\\(T\\)){0,}(?=\\W)")
+        arg.funcstr = replace(arg.funcstr, reg => "$(func.funcname)(T)")
+    end
+end
+
 function disorder_id(db::Database, phas::Phase)
     code = phas.type
     for char in code
@@ -298,33 +372,6 @@ function disorder_id(db::Database, phas::Phase)
         end
     end
     return nothing
-end
-
-function init_system(db::Database)
-    elems = Vector{Element}()
-    phass = Vector{Phase}()
-
-    for ph in db.phass
-        if ph.state == 'G'
-            @warn "Gaseous phase is not supported yet. Exclude $(ph.name)."
-            continue
-        end
-        if any(latt -> "Va" in latt, ph.cons)
-            @warn "$(ph.name) includes vacancies. Exclude the phase."
-            continue
-        end
-        if any(latt -> any(spec -> length(stoichiometry(spec)) > 1, latt), ph.cons)
-            @warn "$(ph.name) includes molcular-like constituents. Calculation may be inaccurate."
-        end
-        push!(phass, ph)
-    end
-
-    for el in db.elems
-        el.name in ["/-", "Va"] && continue
-        push!(elems, el)
-    end
-
-    return init_system(db, elems, phass)
 end
 
 function equiatom(sys::System)

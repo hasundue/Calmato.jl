@@ -9,13 +9,13 @@ end
 
 function isused(func::GFunction, phas::Phase)
     for param in phas.params
-        occursin(func.name, param.funcstr) && return true
+        any(str -> occursin(func.name, str), [param.funcstr, join(param.exprs)]) && return true
     end
     return false
 end
 
 function isused(func1::GFunction, func2::GFunction)
-    return occursin(func1.name, func2.funcstr)
+    return any(str -> occursin(func1.name, str), [func2.funcstr, join(func2.exprs)])
 end
 
 function constitutionstring(phas::Phase, s::Int)

@@ -30,7 +30,7 @@ function subscript(x::Float64)
 end
 
 function composedof(spec::AbstractString)
-    rms = collect(eachmatch(r"\D{1,2}(?=\d{1,}|$)", spec))
+    rms = collect(eachmatch(r"[A-Z][a-z]{0,1}(\d{0,})", spec))
     isempty(rms) && @error "Unrecognized specie name"
     return map(rm -> rm.match, rms)
 end
@@ -41,7 +41,8 @@ function iscomposedof(spec::AbstractString, elems::Vector{<:AbstractString})
 end
 
 function stoichiometry(spec::AbstractString)
-    rms = collect(eachmatch(r"(?=\D{1,2}(\d{1,}|$))\D{1,2}", spec))
+    # rms = collect(eachmatch(r"(?=\D{1,2}(\d{1,}|$))\D{1,2}", spec))
+    rms = collect(eachmatch(r"[A-Z][a-z]{0,1}(\d{0,})", spec))
     isempty(rms) && @error "Unrecognized specie name"
     elems = map(rm -> rm.match, rms)
     stois = map(rm -> rm.captures, rms)
